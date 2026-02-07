@@ -17,12 +17,12 @@ is
    * @param p_enqueue Отправка включена.
    * @param p_dequeue Извлечение включено.
    */
-  procedure register_q(p_qname in varchar2,
-                       p_try_count in pls_integer default 5,
-                       p_try_delay in number default 0,
-                       p_low_latency in varchar2 default 'N',
-                       p_enqueue in varchar2 default 'Y',
-                       p_dequeue in varchar2 default 'Y');
+  procedure create_q(p_qname in varchar2,
+                     p_try_count in pls_integer default 5,
+                     p_try_delay in number default 0,
+                     p_low_latency in varchar2 default 'N',
+                     p_enqueue in varchar2 default 'Y',
+                     p_dequeue in varchar2 default 'Y');
   
   /**
    * Обновление параметров очереди.
@@ -30,21 +30,27 @@ is
    * @param p_try_count Максимальное число попыток извлечений.
    * @param p_try_delay Задержка повторной попытки извлечения.
    * @param p_low_latency Минимальная задержка извлечения.
-   * @param p_enqueue Отправка включена.
-   * @param p_dequeue Извлечение включено.
    */
   procedure update_q(p_qname in varchar2,
                      p_try_count in pls_integer default null,
                      p_try_delay in number default null,
-                     p_low_latency in varchar2 default null,
-                     p_enqueue in varchar2 default null,
-                     p_dequeue in varchar2 default null);
+                     p_low_latency in varchar2 default null);
+  
+  /**
+   * Включение / отключение очереди.
+   * @param p_qname Наименование очереди.
+   * @param p_enqueue Статус отправки (Y/N).
+   * @param p_dequeue Статус получения (Y/N).
+   */
+  procedure enable_q(p_qname in varchar2,
+                     p_enqueue in varchar2 default 'Y',
+                     p_dequeue in varchar2 default 'Y');
   
   /**
    * Удаление очереди.
    * @param p_qname Наименование очереди.
    */
-  procedure drop_q(p_qname in varchar2);
+  procedure drop_q(p_qname in varchar2, p_wait in pls_integer default 5);
   
   /**
    * Отправка массива сообщений в очередь (канал данных не поддерживается).
@@ -129,6 +135,16 @@ is
   function deq_id(p_id in pls_integer default 1) return raw;
   
   /**
+   * Очистить сообщения из очереди.
+   * @param p_qname Наименование очереди.
+   * @param p_use_pipe Использование канала данных.
+   * @param p_wait Использование канала данных.
+   */
+  procedure purge_q(p_qname in varchar2, 
+                    p_use_pipe in varchar2 default 'N',
+                    p_wait in pls_integer default 0);
+  
+  /**
    * Процесс отслеживания времени жизни сообщений и их возврата в обработку.
    * @param p_qname Наименование очереди.
    */           
@@ -198,13 +214,50 @@ is
     raise_application_error(-20200 - p_n, p_message, true);
   end;
   
-  function seconds(p_a in timestamp, p_b in timestamp) return number
+  function secs(p_a in timestamp, p_b in timestamp) return number
   is
   begin
     return extract(day from (p_a - p_b)) * 86400 +
            extract(hour from (p_a - p_b)) * 3600 +
            extract(minute from (p_a - p_b)) * 60 +
            extract(second from (p_a - p_b));
+  end;
+  
+  function set_parameter(p_name in varchar2, p_value in varchar2) return varchar2
+  is
+    l_value varchar2(4000);
+  begin
+    if p_value is null then
+      return l_value;
+    end if;
+    for i in (select value 
+                from v$parameter p 
+               where p.name = lower(p_name) 
+                 and p.isses_modifiable = 'TRUE' 
+                 and not p.value = p_value) 
+    loop
+      l_value := i.value;
+      if not l_value = p_value then
+        execute immediate 'ater session set ' || p_name || ' = ' || p_value;
+      end if;
+    end loop;
+    return l_value;
+  end;
+  
+  procedure exe_at(p_sql in varchar2, p_wait in pls_integer default 0)
+  is
+    l_value varchar2(4000);
+    pragma autonomous_transaction;
+  begin
+    l_value := set_parameter('ddl_lock_timeout', p_wait);
+    execute immediate p_sql;
+    l_value := set_parameter('ddl_lock_timeout', l_value);
+    commit;
+  exception
+    when others then
+      rollback;
+      l_value := set_parameter('ddl_lock_timeout', l_value);
+      raise;
   end;
   
   procedure load_xid_t
@@ -280,47 +333,68 @@ is
     end if;
   end;
   
-  procedure register_q(p_qname in varchar2,
-                       p_try_count in pls_integer default 5,
-                       p_try_delay in number default 0,
-                       p_low_latency in varchar2 default 'N',
-                       p_enqueue in varchar2 default 'Y',
-                       p_dequeue in varchar2 default 'Y')
+  procedure create_q(p_qname in varchar2,
+                     p_try_count in pls_integer default 5,
+                     p_try_delay in number default 0,
+                     p_low_latency in varchar2 default 'N',
+                     p_enqueue in varchar2 default 'Y',
+                     p_dequeue in varchar2 default 'Y')
   is
+    c_id constant number := seq_qid.nextval;
   begin
-    begin
-      insert into t_queue(id, name, try_count, try_delay, low_latency, enqueue, dequeue) 
-           values (seq_qid.nextval, p_qname, coalesce(p_try_count, 5), coalesce(p_try_delay, 0), 
-                                    coalesce(p_low_latency, 'N'), coalesce(p_enqueue, 'Y'), coalesce(p_dequeue, 'Y'));
-    exception
-      when dup_val_on_index then
-        throw(3, 'Очередь (' || p_qname || ') уже существует');
-    end;
+    insert into t_queue(id, name, try_count, try_delay, low_latency, enqueue, dequeue) 
+         values (c_id, p_qname, coalesce(p_try_count, 5), coalesce(p_try_delay, 0), 
+                                coalesce(p_low_latency, 'N'), coalesce(p_enqueue, 'Y'), coalesce(p_dequeue, 'Y'));
+    -- Создание партиции.
+    exe_at('alter table "' || c_schema || '"."' || c_data_table || '" add partition "SYS_P' || c_id || '"" values in (' || c_id || ', ' || -c_id || ')');
+  exception
+    when dup_val_on_index then
+      throw(3, 'Очередь (' || p_qname || ') уже существует');
   end;
   
   procedure update_q(p_qname in varchar2,
                      p_try_count in pls_integer default null,
                      p_try_delay in number default null,
-                     p_low_latency in varchar2 default null,
-                     p_enqueue in varchar2 default null,
-                     p_dequeue in varchar2 default null)
+                     p_low_latency in varchar2 default null)
   is
   begin
     init_queue(p_qname);
     update t_queue q
        set q.try_count = coalesce(p_try_count, q.try_count),
            q.try_delay = coalesce(p_try_delay, q.try_delay),
-           q.low_latency = coalesce(p_low_latency, q.low_latency),
-           q.enqueue = coalesce(p_enqueue, q.enqueue),
+           q.low_latency = coalesce(p_low_latency, q.low_latency)
+     where q.id = g_queue.id;
+  end;
+  
+  procedure enable_q(p_qname in varchar2,
+                     p_enqueue in varchar2 default 'Y',
+                     p_dequeue in varchar2 default 'Y')
+  is
+  begin
+    init_queue(p_qname);
+    update t_queue q
+       set q.enqueue = coalesce(p_enqueue, q.enqueue),
            q.dequeue = coalesce(p_dequeue, q.dequeue)
      where q.id = g_queue.id;
   end;
   
-  procedure drop_q(p_qname in varchar2)
+  procedure drop_q(p_qname in varchar2, p_wait in pls_integer default 5)
   is
+    l_status integer;
   begin
     init_queue(p_qname);
+    if g_queue.enqueue = 'Y' then
+      throw(5, 'Отправка сообщений должна быть отключена (' || p_qname || ')');
+    end if;
+    if g_queue.dequeue = 'Y' then
+      throw(9, 'Извлечение сообщений должно быть отключено (' || p_qname || ')');
+    end if;
     delete from t_queue where id = g_queue.id;
+    dbms_pipe.purge(g_queue.notify_pipe);
+    l_status := dbms_pipe.remove_pipe(g_queue.notify_pipe);
+    dbms_pipe.purge(g_queue.queue_pipe);
+    l_status := dbms_pipe.remove_pipe(g_queue.queue_pipe);
+    exe_at('alter table "' || c_schema || '"."' || c_data_table || '" drop partition SYS_P' || g_queue.id, p_wait => p_wait);
   end;
 
   /**
@@ -898,6 +972,20 @@ is
       return null;
     end if;
   end;
+   
+  procedure purge_q(p_qname in varchar2, 
+                    p_use_pipe in varchar2 default 'N',
+                    p_wait in pls_integer default 0)
+  is
+    pragma autonomous_transaction;
+  begin
+    init_queue(p_qname);
+    if p_use_pipe = 'Y' then
+      dbms_pipe.purge(g_queue.queue_pipe);
+    else
+      exe_at('alter table "' || c_schema || '"."' || c_data_table || '" truncate partition for (' || g_queue.id || ')', p_wait => p_wait);  
+    end if;
+  end;
   
   /**
    * Функия контроля активности процессов и периода их запуска.
@@ -913,7 +1001,7 @@ is
     loop
       l_time := systimestamp() at time zone 'utc';
       exit when p_next_time is null or l_time >= p_next_time;
-      dbms_lock.sleep(greatest(seconds(p_next_time, l_time), 0) + 0.005); 
+      dbms_lock.sleep(greatest(secs(p_next_time, l_time), 0) + 0.005); 
     end loop;
     begin
       select p.period
@@ -1050,8 +1138,8 @@ is
                    and p.segment_created = 'YES')
       loop
         begin
-          dbms_utility.exec_ddl_statement('alter index "' || c_schema || '"."' || c_data_index || '" ' || 
-                                          'modify partition "' || i.partition_name || '" coalesce');
+          exe_at('alter index "' || c_schema || '"."' || c_data_index || '" modify partition "' || 
+                 i.partition_name || '" coalesce');
         exception
           when others then
             l_e := dbms_utility.format_error_stack;
