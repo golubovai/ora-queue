@@ -11,6 +11,7 @@ is
   /**
    * Регистрация новой очереди.
    * @param p_qname Наименование очереди.
+   * @param p_comment Комментарий.
    * @param p_try_count Максимальное число попыток извлечений.
    * @param p_try_delay Задержка повторной попытки извлечения.
    * @param p_low_latency Минимальная задержка извлечения.
@@ -18,6 +19,7 @@ is
    * @param p_dequeue Извлечение включено.
    */
   procedure create_q(p_qname in varchar2,
+                     p_comment in varchar2 default null,
                      p_try_count in pls_integer default 5,
                      p_try_delay in number default 0,
                      p_low_latency in varchar2 default 'N',
@@ -27,11 +29,13 @@ is
   /**
    * Обновление параметров очереди.
    * @param p_qname Наименование очереди.
+   * @param p_comment Комментарий.
    * @param p_try_count Максимальное число попыток извлечений.
    * @param p_try_delay Задержка повторной попытки извлечения.
    * @param p_low_latency Минимальная задержка извлечения.
    */
   procedure update_q(p_qname in varchar2,
+                     p_comment in varchar2 default null,
                      p_try_count in pls_integer default null,
                      p_try_delay in number default null,
                      p_low_latency in varchar2 default null);
@@ -334,6 +338,7 @@ is
   end;
   
   procedure create_q(p_qname in varchar2,
+                     p_comment in varchar2 default null,
                      p_try_count in pls_integer default 5,
                      p_try_delay in number default 0,
                      p_low_latency in varchar2 default 'N',
@@ -342,8 +347,8 @@ is
   is
     c_id constant number := seq_qid.nextval;
   begin
-    insert into t_queue(id, name, try_count, try_delay, low_latency, enqueue, dequeue) 
-         values (c_id, p_qname, coalesce(p_try_count, 5), coalesce(p_try_delay, 0), 
+    insert into t_queue(id, name, comment_, try_count, try_delay, low_latency, enqueue, dequeue) 
+         values (c_id, p_qname, p_comment, coalesce(p_try_count, 5), coalesce(p_try_delay, 0), 
                                 coalesce(p_low_latency, 'N'), coalesce(p_enqueue, 'Y'), coalesce(p_dequeue, 'Y'));
     -- Создание партиции.
     exe_at('alter table "' || c_schema || '"."' || c_data_table || '" add partition "SYS_P' || c_id || '"" values in (' || c_id || ', ' || -c_id || ')');
@@ -353,6 +358,7 @@ is
   end;
   
   procedure update_q(p_qname in varchar2,
+                     p_comment in varchar2 default null,
                      p_try_count in pls_integer default null,
                      p_try_delay in number default null,
                      p_low_latency in varchar2 default null)
@@ -360,7 +366,8 @@ is
   begin
     init_queue(p_qname);
     update t_queue q
-       set q.try_count = coalesce(p_try_count, q.try_count),
+       set q.comment_ = coalesce(p_comment, q.comment_),
+           q.try_count = coalesce(p_try_count, q.try_count),
            q.try_delay = coalesce(p_try_delay, q.try_delay),
            q.low_latency = coalesce(p_low_latency, q.low_latency)
      where q.id = g_queue.id;

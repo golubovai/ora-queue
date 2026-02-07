@@ -1,6 +1,7 @@
 create sequence seq_qid;
 create table t_queue(id integer,
                      name varchar2(100),
+                     comment_ varchar2(500),
                      try_count integer,
                      try_delay number,
                      low_latency varchar2(1),
@@ -18,6 +19,7 @@ create unique index qe_ne_unq on t_queue(name);
 comment on table t_queue is 'Очередь';
 comment on column t_queue.id is 'Идентификатор очереди';
 comment on column t_queue.name is 'Наименование очереди';
+comment on column t_queue.comment_ is 'Комментарий';
 comment on column t_queue.try_count is 'Число попыток обработки';
 comment on column t_queue.try_delay is 'Задержка повторной попытки обработки';
 comment on column t_queue.low_latency is 'Минимальная задержка извлечения';
