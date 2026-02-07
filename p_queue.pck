@@ -439,7 +439,7 @@ is
       exit when l_status = 0;
       if l_status = 1 then
         l_n := l_n + 1;
-        if l_n >= c_pipe_count then
+        if l_n > c_pipe_count then
           l_n := 1;
         end if;
         if l_n = l_s then
@@ -622,7 +622,7 @@ is
       exit when deq_pipe(g_queue.queue_pipe || to_char(l_n, 'fm0x'), l_wait, p_payload);
       l_wait := 0;
       l_n := l_n + 1;
-      if l_n >= c_pipe_count then
+      if l_n > c_pipe_count then
         l_n := 1;
       end if;
       if l_n = l_s then
