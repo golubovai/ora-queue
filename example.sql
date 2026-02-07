@@ -1,5 +1,5 @@
 begin
-  p_queue.register_q('QS', 5);
+  p_queue.create_q('QS', p_try_count => 5);
 end;
 
 begin

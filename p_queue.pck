@@ -351,7 +351,7 @@ is
          values (c_id, p_qname, p_comment, coalesce(p_try_count, 5), coalesce(p_try_delay, 0), 
                                 coalesce(p_low_latency, 'N'), coalesce(p_enqueue, 'Y'), coalesce(p_dequeue, 'Y'));
     -- Создание партиции.
-    exe_at('alter table "' || c_schema || '"."' || c_data_table || '" add partition "SYS_P' || c_id || '"" values in (' || c_id || ', ' || -c_id || ')');
+    exe_at('alter table "' || c_schema || '"."' || c_data_table || '" add partition "SYS_P' || c_id || '" values (' || c_id || ', ' || -c_id || ')');
   exception
     when dup_val_on_index then
       throw(3, 'Очередь (' || p_qname || ') уже существует');
