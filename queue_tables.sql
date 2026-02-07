@@ -15,14 +15,14 @@ alter table t_queue add check (enqueue is not null and enqueue in ('Y', 'N'));
 alter table t_queue add check (dequeue is not null and dequeue in ('Y', 'N'));
 create unique index qe_unq on t_queue(id);
 create unique index qe_ne_unq on t_queue(name);
-comment on table t_queue is 'Î÷åğåäü';
-comment on column t_queue.id is 'Èäåíòèôèêàòîğ î÷åğåäè';
-comment on column t_queue.name is 'Íàèìåíîâàíèå î÷åğåäè';
-comment on column t_queue.try_count is '×èñëî ïîïûòîê îáğàáîòêè';
-comment on column t_queue.try_delay is 'Çàäåğæêà ïîâòîğíîé ïîïûòêè îáğàáîòêè';
-comment on column t_queue.low_latency is 'Ìèíèìàëüíàÿ çàäåğæêà èçâëå÷åíèÿ';
-comment on column t_queue.enqueue is 'Îòïğàâêà âêëş÷åíà';
-comment on column t_queue.dequeue is 'Èçâëå÷åíèå âêëş÷åíî';
+comment on table t_queue is 'ĞÑ‡ĞµÑ€ĞµĞ´ÑŒ';
+comment on column t_queue.id is 'Ğ˜Ğ´ĞµĞ½Ñ‚Ğ¸Ñ„Ğ¸ĞºĞ°Ñ‚Ğ¾Ñ€ Ğ¾Ñ‡ĞµÑ€ĞµĞ´Ğ¸';
+comment on column t_queue.name is 'ĞĞ°Ğ¸Ğ¼ĞµĞ½Ğ¾Ğ²Ğ°Ğ½Ğ¸Ğµ Ğ¾Ñ‡ĞµÑ€ĞµĞ´Ğ¸';
+comment on column t_queue.try_count is 'Ğ§Ğ¸ÑĞ»Ğ¾ Ğ¿Ğ¾Ğ¿Ñ‹Ñ‚Ğ¾Ğº Ğ¾Ğ±Ñ€Ğ°Ğ±Ğ¾Ñ‚ĞºĞ¸';
+comment on column t_queue.try_delay is 'Ğ—Ğ°Ğ´ĞµÑ€Ğ¶ĞºĞ° Ğ¿Ğ¾Ğ²Ñ‚Ğ¾Ñ€Ğ½Ğ¾Ğ¹ Ğ¿Ğ¾Ğ¿Ñ‹Ñ‚ĞºĞ¸ Ğ¾Ğ±Ñ€Ğ°Ğ±Ğ¾Ñ‚ĞºĞ¸';
+comment on column t_queue.low_latency is 'ĞœĞ¸Ğ½Ğ¸Ğ¼Ğ°Ğ»ÑŒĞ½Ğ°Ñ Ğ·Ğ°Ğ´ĞµÑ€Ğ¶ĞºĞ° Ğ¸Ğ·Ğ²Ğ»ĞµÑ‡ĞµĞ½Ğ¸Ñ';
+comment on column t_queue.enqueue is 'ĞÑ‚Ğ¿Ñ€Ğ°Ğ²ĞºĞ° Ğ²ĞºĞ»ÑÑ‡ĞµĞ½Ğ°';
+comment on column t_queue.dequeue is 'Ğ˜Ğ·Ğ²Ğ»ĞµÑ‡ĞµĞ½Ğ¸Ğµ Ğ²ĞºĞ»ÑÑ‡ĞµĞ½Ğ¾';
 
 
 create table t_queue_data(qid integer,
@@ -42,17 +42,17 @@ alter table t_queue_data add check (enq_time is not null);
 alter table t_queue_data add check (id is not null);
 create index qeda_id_idx on t_queue_data(id) local;
 create index qeda_sepyee_idx on t_queue_data(state, priority, enq_time) local pctfree 0;
-comment on table t_queue_data is 'Äàííûå ñîîáùåíèÿ î÷åğåäè';
-comment on column t_queue_data.qid is 'Èäåíòèôèêàòîğ î÷åğåäè';
-comment on column t_queue_data.state is 'Ñîñòîÿíèå ñîîáùåíèÿ';
-comment on column t_queue_data.priority is 'Ïğèîğèòåò ñîîáùåíèÿ';
-comment on column t_queue_data.enq_time is 'Âğåìÿ äîñòóïíîñòè ñîîáùåíèÿ';
-comment on column t_queue_data.id is 'Èäåíòèôèêàòîğ ñîîáùåíèÿ';
-comment on column t_queue_data.payload is 'Äàííûå ñîîáùåíèÿ';
-comment on column t_queue_data.expire_time is 'Âğåìÿ æèçíè ñîîáùåíèÿ';
-comment on column t_queue_data.deq_try is 'Èçâëå÷åíèé ñîîáùåíèÿ ïğîèçâåäåíî';
-comment on column t_queue_data.deq_xid is 'Èäåíòèôèêàòîğ òğàíçàêöèè èçâëå÷åíèÿ ñîîáùåíèÿ';
-comment on column t_queue_data.deq_time is 'Âğåìÿ èçâëå÷åíèÿ ñîîáùåíèÿ';
+comment on table t_queue_data is 'Ğ”Ğ°Ğ½Ğ½Ñ‹Ğµ ÑĞ¾Ğ¾Ğ±Ñ‰ĞµĞ½Ğ¸Ñ Ğ¾Ñ‡ĞµÑ€ĞµĞ´Ğ¸';
+comment on column t_queue_data.qid is 'Ğ˜Ğ´ĞµĞ½Ñ‚Ğ¸Ñ„Ğ¸ĞºĞ°Ñ‚Ğ¾Ñ€ Ğ¾Ñ‡ĞµÑ€ĞµĞ´Ğ¸';
+comment on column t_queue_data.state is 'Ğ¡Ğ¾ÑÑ‚Ğ¾ÑĞ½Ğ¸Ğµ ÑĞ¾Ğ¾Ğ±Ñ‰ĞµĞ½Ğ¸Ñ';
+comment on column t_queue_data.priority is 'ĞŸÑ€Ğ¸Ğ¾Ñ€Ğ¸Ñ‚ĞµÑ‚ ÑĞ¾Ğ¾Ğ±Ñ‰ĞµĞ½Ğ¸Ñ';
+comment on column t_queue_data.enq_time is 'Ğ’Ñ€ĞµĞ¼Ñ Ğ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ½Ğ¾ÑÑ‚Ğ¸ ÑĞ¾Ğ¾Ğ±Ñ‰ĞµĞ½Ğ¸Ñ';
+comment on column t_queue_data.id is 'Ğ˜Ğ´ĞµĞ½Ñ‚Ğ¸Ñ„Ğ¸ĞºĞ°Ñ‚Ğ¾Ñ€ ÑĞ¾Ğ¾Ğ±Ñ‰ĞµĞ½Ğ¸Ñ';
+comment on column t_queue_data.payload is 'Ğ”Ğ°Ğ½Ğ½Ñ‹Ğµ ÑĞ¾Ğ¾Ğ±Ñ‰ĞµĞ½Ğ¸Ñ';
+comment on column t_queue_data.expire_time is 'Ğ’Ñ€ĞµĞ¼Ñ Ğ¶Ğ¸Ğ·Ğ½Ğ¸ ÑĞ¾Ğ¾Ğ±Ñ‰ĞµĞ½Ğ¸Ñ';
+comment on column t_queue_data.deq_try is 'Ğ˜Ğ·Ğ²Ğ»ĞµÑ‡ĞµĞ½Ğ¸Ğ¹ ÑĞ¾Ğ¾Ğ±Ñ‰ĞµĞ½Ğ¸Ñ Ğ¿Ñ€Ğ¾Ğ¸Ğ·Ğ²ĞµĞ´ĞµĞ½Ğ¾';
+comment on column t_queue_data.deq_xid is 'Ğ˜Ğ´ĞµĞ½Ñ‚Ğ¸Ñ„Ğ¸ĞºĞ°Ñ‚Ğ¾Ñ€ Ñ‚Ñ€Ğ°Ğ½Ğ·Ğ°ĞºÑ†Ğ¸Ğ¸ Ğ¸Ğ·Ğ²Ğ»ĞµÑ‡ĞµĞ½Ğ¸Ñ ÑĞ¾Ğ¾Ğ±Ñ‰ĞµĞ½Ğ¸Ñ';
+comment on column t_queue_data.deq_time is 'Ğ’Ñ€ĞµĞ¼Ñ Ğ¸Ğ·Ğ²Ğ»ĞµÑ‡ĞµĞ½Ğ¸Ñ ÑĞ¾Ğ¾Ğ±Ñ‰ĞµĞ½Ğ¸Ñ';
 
 
 create table t_queue_process(name varchar2(128), period number, active varchar2(1));
@@ -60,10 +60,10 @@ alter table t_queue_process add check (name is not null);
 alter table t_queue_process add check (period is not null);
 alter table t_queue_process add check (active is not null and active in ('Y', 'N'));
 create unique index qeps_ne_unq on t_queue_process(name);
-comment on table t_queue_process is 'Ñëóæåáíûé ïğîöåññ î÷åğåäè';
-comment on column t_queue_process.name is 'Íàèìåíîâàíèå ïğîöåññà';
-comment on column t_queue_process.period is 'Ïåğèîä ğàáîòû';
-comment on column t_queue_process.active is 'Àêòèâåí';
+comment on table t_queue_process is 'Ğ¡Ğ»ÑƒĞ¶ĞµĞ±Ğ½Ñ‹Ğ¹ Ğ¿Ñ€Ğ¾Ñ†ĞµÑÑ Ğ¾Ñ‡ĞµÑ€ĞµĞ´Ğ¸';
+comment on column t_queue_process.name is 'ĞĞ°Ğ¸Ğ¼ĞµĞ½Ğ¾Ğ²Ğ°Ğ½Ğ¸Ğµ Ğ¿Ñ€Ğ¾Ñ†ĞµÑÑĞ°';
+comment on column t_queue_process.period is 'ĞŸĞµÑ€Ğ¸Ğ¾Ğ´ Ñ€Ğ°Ğ±Ğ¾Ñ‚Ñ‹';
+comment on column t_queue_process.active is 'ĞĞºÑ‚Ğ¸Ğ²ĞµĞ½';
 
 insert into t_queue_process values ('monitor', 1, 'Y');
 insert into t_queue_process values ('maintenance', 20, 'Y');
@@ -71,7 +71,7 @@ commit;
 
 @@p_queue.pck
 
--- Çàâîäèò çàäàíèÿ ìîíèòîğèíãà è îáñëóæèâàíèÿ.
+-- Ğ—Ğ°Ğ²Ğ¾Ğ´Ğ¸Ñ‚ Ğ·Ğ°Ğ´Ğ°Ğ½Ğ¸Ñ Ğ¼Ğ¾Ğ½Ğ¸Ñ‚Ğ¾Ñ€Ğ¸Ğ½Ğ³Ğ° Ğ¸ Ğ¾Ğ±ÑĞ»ÑƒĞ¶Ğ¸Ğ²Ğ°Ğ½Ğ¸Ñ.
 begin
   dbms_scheduler.create_job('QMONITOR', 'PLSQL_BLOCK', 'p_queue.monitor;', start_date => systimestamp(), repeat_interval => 'freq=minutely;', enabled => true);
   dbms_scheduler.create_job('QMAINTENANCE', 'PLSQL_BLOCK', 'p_queue.maintenance;', start_date => systimestamp(), repeat_interval => 'freq=minutely;', enabled => true);

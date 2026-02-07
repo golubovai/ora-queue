@@ -1,21 +1,21 @@
 create or replace package p_queue 
 is
   
-  -- Исключение при переполнении всех каналов данных (можно сделать паузу).
+  -- РСЃРєР»СЋС‡РµРЅРёРµ РїСЂРё РїРµСЂРµРїРѕР»РЅРµРЅРёРё РІСЃРµС… РєР°РЅР°Р»РѕРІ РґР°РЅРЅС‹С… (РјРѕР¶РЅРѕ СЃРґРµР»Р°С‚СЊ РїР°СѓР·Сѓ).
   high_enq_rate exception;
   pragma exception_init(high_enq_rate, -25307);
   
-  -- Таблица сообщений.
+  -- РўР°Р±Р»РёС†Р° СЃРѕРѕР±С‰РµРЅРёР№.
   type te_payload_t is table of blob;
   
   /**
-   * Регистрация новой очереди.
-   * @param p_qname Наименование очереди.
-   * @param p_try_count Максимальное число попыток извлечений.
-   * @param p_try_delay Задержка повторной попытки извлечения.
-   * @param p_low_latency Минимальная задержка извлечения.
-   * @param p_enqueue Отправка включена.
-   * @param p_dequeue Извлечение включено.
+   * Р РµРіРёСЃС‚СЂР°С†РёСЏ РЅРѕРІРѕР№ РѕС‡РµСЂРµРґРё.
+   * @param p_qname РќР°РёРјРµРЅРѕРІР°РЅРёРµ РѕС‡РµСЂРµРґРё.
+   * @param p_try_count РњР°РєСЃРёРјР°Р»СЊРЅРѕРµ С‡РёСЃР»Рѕ РїРѕРїС‹С‚РѕРє РёР·РІР»РµС‡РµРЅРёР№.
+   * @param p_try_delay Р—Р°РґРµСЂР¶РєР° РїРѕРІС‚РѕСЂРЅРѕР№ РїРѕРїС‹С‚РєРё РёР·РІР»РµС‡РµРЅРёСЏ.
+   * @param p_low_latency РњРёРЅРёРјР°Р»СЊРЅР°СЏ Р·Р°РґРµСЂР¶РєР° РёР·РІР»РµС‡РµРЅРёСЏ.
+   * @param p_enqueue РћС‚РїСЂР°РІРєР° РІРєР»СЋС‡РµРЅР°.
+   * @param p_dequeue РР·РІР»РµС‡РµРЅРёРµ РІРєР»СЋС‡РµРЅРѕ.
    */
   procedure register_q(p_qname in varchar2,
                        p_try_count in pls_integer default 5,
@@ -25,13 +25,13 @@ is
                        p_dequeue in varchar2 default 'Y');
   
   /**
-   * Обновление параметров очереди.
-   * @param p_qname Наименование очереди.
-   * @param p_try_count Максимальное число попыток извлечений.
-   * @param p_try_delay Задержка повторной попытки извлечения.
-   * @param p_low_latency Минимальная задержка извлечения.
-   * @param p_enqueue Отправка включена.
-   * @param p_dequeue Извлечение включено.
+   * РћР±РЅРѕРІР»РµРЅРёРµ РїР°СЂР°РјРµС‚СЂРѕРІ РѕС‡РµСЂРµРґРё.
+   * @param p_qname РќР°РёРјРµРЅРѕРІР°РЅРёРµ РѕС‡РµСЂРµРґРё.
+   * @param p_try_count РњР°РєСЃРёРјР°Р»СЊРЅРѕРµ С‡РёСЃР»Рѕ РїРѕРїС‹С‚РѕРє РёР·РІР»РµС‡РµРЅРёР№.
+   * @param p_try_delay Р—Р°РґРµСЂР¶РєР° РїРѕРІС‚РѕСЂРЅРѕР№ РїРѕРїС‹С‚РєРё РёР·РІР»РµС‡РµРЅРёСЏ.
+   * @param p_low_latency РњРёРЅРёРјР°Р»СЊРЅР°СЏ Р·Р°РґРµСЂР¶РєР° РёР·РІР»РµС‡РµРЅРёСЏ.
+   * @param p_enqueue РћС‚РїСЂР°РІРєР° РІРєР»СЋС‡РµРЅР°.
+   * @param p_dequeue РР·РІР»РµС‡РµРЅРёРµ РІРєР»СЋС‡РµРЅРѕ.
    */
   procedure update_q(p_qname in varchar2,
                      p_try_count in pls_integer default null,
@@ -41,19 +41,19 @@ is
                      p_dequeue in varchar2 default null);
   
   /**
-   * Удаление очереди.
-   * @param p_qname Наименование очереди.
+   * РЈРґР°Р»РµРЅРёРµ РѕС‡РµСЂРµРґРё.
+   * @param p_qname РќР°РёРјРµРЅРѕРІР°РЅРёРµ РѕС‡РµСЂРµРґРё.
    */
   procedure drop_q(p_qname in varchar2);
   
   /**
-   * Отправка массива сообщений в очередь (канал данных не поддерживается).
-   * @param p_qname Наименование очереди.
-   * @param p_payload_array Массив сообщения.
-   * @param p_immediate Немедленная отправка в очередь (автономная транзакция).
-   * @param p_priority Приоритет сообщения.
-   * @param p_delay Задержка видимости сообщения.
-   * @param p_expire Время жизни сообщения.
+   * РћС‚РїСЂР°РІРєР° РјР°СЃСЃРёРІР° СЃРѕРѕР±С‰РµРЅРёР№ РІ РѕС‡РµСЂРµРґСЊ (РєР°РЅР°Р» РґР°РЅРЅС‹С… РЅРµ РїРѕРґРґРµСЂР¶РёРІР°РµС‚СЃСЏ).
+   * @param p_qname РќР°РёРјРµРЅРѕРІР°РЅРёРµ РѕС‡РµСЂРµРґРё.
+   * @param p_payload_array РњР°СЃСЃРёРІ СЃРѕРѕР±С‰РµРЅРёСЏ.
+   * @param p_immediate РќРµРјРµРґР»РµРЅРЅР°СЏ РѕС‚РїСЂР°РІРєР° РІ РѕС‡РµСЂРµРґСЊ (Р°РІС‚РѕРЅРѕРјРЅР°СЏ С‚СЂР°РЅР·Р°РєС†РёСЏ).
+   * @param p_priority РџСЂРёРѕСЂРёС‚РµС‚ СЃРѕРѕР±С‰РµРЅРёСЏ.
+   * @param p_delay Р—Р°РґРµСЂР¶РєР° РІРёРґРёРјРѕСЃС‚Рё СЃРѕРѕР±С‰РµРЅРёСЏ.
+   * @param p_expire Р’СЂРµРјСЏ Р¶РёР·РЅРё СЃРѕРѕР±С‰РµРЅРёСЏ.
    */
   procedure enq_array(p_qname in varchar2,
                       p_payload_array in te_payload_t,
@@ -63,14 +63,14 @@ is
                       p_expire in number default 0);
   
   /**
-   * Отправка сообщения в очередь.
-   * @param p_qname Наименование очереди.
-   * @param p_payload Сообщение.
-   * @param p_use_pipe Использование канала данных.
-   * @param p_immediate Немедленная отправка в очередь (автономная транзакция).
-   * @param p_priority Приоритет сообщения.
-   * @param p_delay Задержка видимости сообщения.
-   * @param p_expire Время жизни сообщения.
+   * РћС‚РїСЂР°РІРєР° СЃРѕРѕР±С‰РµРЅРёСЏ РІ РѕС‡РµСЂРµРґСЊ.
+   * @param p_qname РќР°РёРјРµРЅРѕРІР°РЅРёРµ РѕС‡РµСЂРµРґРё.
+   * @param p_payload РЎРѕРѕР±С‰РµРЅРёРµ.
+   * @param p_use_pipe РСЃРїРѕР»СЊР·РѕРІР°РЅРёРµ РєР°РЅР°Р»Р° РґР°РЅРЅС‹С….
+   * @param p_immediate РќРµРјРµРґР»РµРЅРЅР°СЏ РѕС‚РїСЂР°РІРєР° РІ РѕС‡РµСЂРµРґСЊ (Р°РІС‚РѕРЅРѕРјРЅР°СЏ С‚СЂР°РЅР·Р°РєС†РёСЏ).
+   * @param p_priority РџСЂРёРѕСЂРёС‚РµС‚ СЃРѕРѕР±С‰РµРЅРёСЏ.
+   * @param p_delay Р—Р°РґРµСЂР¶РєР° РІРёРґРёРјРѕСЃС‚Рё СЃРѕРѕР±С‰РµРЅРёСЏ.
+   * @param p_expire Р’СЂРµРјСЏ Р¶РёР·РЅРё СЃРѕРѕР±С‰РµРЅРёСЏ.
    */
   procedure enq(p_qname in varchar2,
                 p_payload in blob,
@@ -81,20 +81,20 @@ is
                 p_expire in number default 0);
   
   /**
-   * Получить идентификаторы отправленных сообщений.
-   * @param p_id Порядковый номер сообщения (для массива).
-   * @return Идентификатор отправленного сообщения.
+   * РџРѕР»СѓС‡РёС‚СЊ РёРґРµРЅС‚РёС„РёРєР°С‚РѕСЂС‹ РѕС‚РїСЂР°РІР»РµРЅРЅС‹С… СЃРѕРѕР±С‰РµРЅРёР№.
+   * @param p_id РџРѕСЂСЏРґРєРѕРІС‹Р№ РЅРѕРјРµСЂ СЃРѕРѕР±С‰РµРЅРёСЏ (РґР»СЏ РјР°СЃСЃРёРІР°).
+   * @return РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ РѕС‚РїСЂР°РІР»РµРЅРЅРѕРіРѕ СЃРѕРѕР±С‰РµРЅРёСЏ.
    */
   function enq_id(p_id in pls_integer default 1) return raw;
   
   /**
-   * Извлечение массива сообщений из очереди (канал данных не поддерживается).
-   * @param p_qname Наименование очереди.
-   * @param p_wait Время ожидания сообщений.
-   * @param p_payload_array Массив сообщений.
-   * @param p_immediate Немедленное извлечение из очереди (автономная транзакция).
-   * @param p_size Число сообщений для извлечения.
-   * @param p_prefetch Число предзагружаемых сообщений в сессии (оптимизация чтения).
+   * РР·РІР»РµС‡РµРЅРёРµ РјР°СЃСЃРёРІР° СЃРѕРѕР±С‰РµРЅРёР№ РёР· РѕС‡РµСЂРµРґРё (РєР°РЅР°Р» РґР°РЅРЅС‹С… РЅРµ РїРѕРґРґРµСЂР¶РёРІР°РµС‚СЃСЏ).
+   * @param p_qname РќР°РёРјРµРЅРѕРІР°РЅРёРµ РѕС‡РµСЂРµРґРё.
+   * @param p_wait Р’СЂРµРјСЏ РѕР¶РёРґР°РЅРёСЏ СЃРѕРѕР±С‰РµРЅРёР№.
+   * @param p_payload_array РњР°СЃСЃРёРІ СЃРѕРѕР±С‰РµРЅРёР№.
+   * @param p_immediate РќРµРјРµРґР»РµРЅРЅРѕРµ РёР·РІР»РµС‡РµРЅРёРµ РёР· РѕС‡РµСЂРµРґРё (Р°РІС‚РѕРЅРѕРјРЅР°СЏ С‚СЂР°РЅР·Р°РєС†РёСЏ).
+   * @param p_size Р§РёСЃР»Рѕ СЃРѕРѕР±С‰РµРЅРёР№ РґР»СЏ РёР·РІР»РµС‡РµРЅРёСЏ.
+   * @param p_prefetch Р§РёСЃР»Рѕ РїСЂРµРґР·Р°РіСЂСѓР¶Р°РµРјС‹С… СЃРѕРѕР±С‰РµРЅРёР№ РІ СЃРµСЃСЃРёРё (РѕРїС‚РёРјРёР·Р°С†РёСЏ С‡С‚РµРЅРёСЏ).
    */
   procedure deq_array(p_qname in varchar2, 
                       p_wait in number,
@@ -104,14 +104,14 @@ is
                       p_prefetch in pls_integer default 1);
   
   /**
-   * Извлечение сообщения из очереди.
-   * @param p_qname Наименование очереди.
-   * @param p_wait Время ожидания сообщения.
-   * @param p_payload Сообщение.
-   * @param p_payload_id Заданный идентификатор сообщения.
-   * @param p_use_pipe Использование канала данных.
-   * @param p_immediate Немедленное извлечение из очереди (автономная транзакция).
-   * @param p_prefetch Число предзагружаемых сообщений в сессии (оптимизация чтения).
+   * РР·РІР»РµС‡РµРЅРёРµ СЃРѕРѕР±С‰РµРЅРёСЏ РёР· РѕС‡РµСЂРµРґРё.
+   * @param p_qname РќР°РёРјРµРЅРѕРІР°РЅРёРµ РѕС‡РµСЂРµРґРё.
+   * @param p_wait Р’СЂРµРјСЏ РѕР¶РёРґР°РЅРёСЏ СЃРѕРѕР±С‰РµРЅРёСЏ.
+   * @param p_payload РЎРѕРѕР±С‰РµРЅРёРµ.
+   * @param p_payload_id Р—Р°РґР°РЅРЅС‹Р№ РёРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ СЃРѕРѕР±С‰РµРЅРёСЏ.
+   * @param p_use_pipe РСЃРїРѕР»СЊР·РѕРІР°РЅРёРµ РєР°РЅР°Р»Р° РґР°РЅРЅС‹С….
+   * @param p_immediate РќРµРјРµРґР»РµРЅРЅРѕРµ РёР·РІР»РµС‡РµРЅРёРµ РёР· РѕС‡РµСЂРµРґРё (Р°РІС‚РѕРЅРѕРјРЅР°СЏ С‚СЂР°РЅР·Р°РєС†РёСЏ).
+   * @param p_prefetch Р§РёСЃР»Рѕ РїСЂРµРґР·Р°РіСЂСѓР¶Р°РµРјС‹С… СЃРѕРѕР±С‰РµРЅРёР№ РІ СЃРµСЃСЃРёРё (РѕРїС‚РёРјРёР·Р°С†РёСЏ С‡С‚РµРЅРёСЏ).
    */
   procedure deq(p_qname in varchar2, 
                 p_wait in number,
@@ -122,21 +122,21 @@ is
                 p_prefetch in pls_integer default 1);
   
   /**
-   * Получить идентификаторы извлеченных сообщений.
-   * @param p_id Порядковый номер сообщения (для массива).
-   * @return Идентификатор извлеченного сообщения.
+   * РџРѕР»СѓС‡РёС‚СЊ РёРґРµРЅС‚РёС„РёРєР°С‚РѕСЂС‹ РёР·РІР»РµС‡РµРЅРЅС‹С… СЃРѕРѕР±С‰РµРЅРёР№.
+   * @param p_id РџРѕСЂСЏРґРєРѕРІС‹Р№ РЅРѕРјРµСЂ СЃРѕРѕР±С‰РµРЅРёСЏ (РґР»СЏ РјР°СЃСЃРёРІР°).
+   * @return РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ РёР·РІР»РµС‡РµРЅРЅРѕРіРѕ СЃРѕРѕР±С‰РµРЅРёСЏ.
    */
   function deq_id(p_id in pls_integer default 1) return raw;
   
   /**
-   * Процесс отслеживания времени жизни сообщений и их возврата в обработку.
-   * @param p_qname Наименование очереди.
+   * РџСЂРѕС†РµСЃСЃ РѕС‚СЃР»РµР¶РёРІР°РЅРёСЏ РІСЂРµРјРµРЅРё Р¶РёР·РЅРё СЃРѕРѕР±С‰РµРЅРёР№ Рё РёС… РІРѕР·РІСЂР°С‚Р° РІ РѕР±СЂР°Р±РѕС‚РєСѓ.
+   * @param p_qname РќР°РёРјРµРЅРѕРІР°РЅРёРµ РѕС‡РµСЂРµРґРё.
    */           
   procedure monitor(p_qname in varchar2 default null);
   
   /**
-   * Процесс очистки индекса очереди от удаленных сообщений.
-   * В случае отсутствия обслуживания может произойти существенное замедление извлечения новых сообщений.
+   * РџСЂРѕС†РµСЃСЃ РѕС‡РёСЃС‚РєРё РёРЅРґРµРєСЃР° РѕС‡РµСЂРµРґРё РѕС‚ СѓРґР°Р»РµРЅРЅС‹С… СЃРѕРѕР±С‰РµРЅРёР№.
+   * Р’ СЃР»СѓС‡Р°Рµ РѕС‚СЃСѓС‚СЃС‚РІРёСЏ РѕР±СЃР»СѓР¶РёРІР°РЅРёСЏ РјРѕР¶РµС‚ РїСЂРѕРёР·РѕР№С‚Рё СЃСѓС‰РµСЃС‚РІРµРЅРЅРѕРµ Р·Р°РјРµРґР»РµРЅРёРµ РёР·РІР»РµС‡РµРЅРёСЏ РЅРѕРІС‹С… СЃРѕРѕР±С‰РµРЅРёР№.
    */
   procedure maintenance;
 
@@ -147,21 +147,21 @@ is
 
   c_schema constant varchar2(128) := sys_context('userenv', 'current_schema');
   
-  -- Статус сообщения.
-  c_state_ready constant integer := 0; -- Доступно для извлечения.
-  c_state_dequeued constant integer := 1; -- Извлечено для обработки.
-  c_state_expired constant integer := 2; -- Время жизни истекло.
+  -- РЎС‚Р°С‚СѓСЃ СЃРѕРѕР±С‰РµРЅРёСЏ.
+  c_state_ready constant integer := 0; -- Р”РѕСЃС‚СѓРїРЅРѕ РґР»СЏ РёР·РІР»РµС‡РµРЅРёСЏ.
+  c_state_dequeued constant integer := 1; -- РР·РІР»РµС‡РµРЅРѕ РґР»СЏ РѕР±СЂР°Р±РѕС‚РєРё.
+  c_state_expired constant integer := 2; -- Р’СЂРµРјСЏ Р¶РёР·РЅРё РёСЃС‚РµРєР»Рѕ.
 
   c_data_table constant varchar2(128) := 'T_QUEUE_DATA';
   c_data_index constant varchar2(128) := 'QEDA_SEPYEE_IDX';
   
-  c_notify_pipe_size constant integer := 1024; -- Размер канала данных уведомлений.
-  c_pipe_size constant pls_integer := 2097152; -- Размер каждого канала данных.
-  c_pipe_count constant pls_integer := 12; -- Число каналов данных.
-  c_prefetch_period constant number := 5; -- Время резервирования предзагруженных сообщений.
+  c_notify_pipe_size constant integer := 1024; -- Р Р°Р·РјРµСЂ РєР°РЅР°Р»Р° РґР°РЅРЅС‹С… СѓРІРµРґРѕРјР»РµРЅРёР№.
+  c_pipe_size constant pls_integer := 2097152; -- Р Р°Р·РјРµСЂ РєР°Р¶РґРѕРіРѕ РєР°РЅР°Р»Р° РґР°РЅРЅС‹С….
+  c_pipe_count constant pls_integer := 12; -- Р§РёСЃР»Рѕ РєР°РЅР°Р»РѕРІ РґР°РЅРЅС‹С….
+  c_prefetch_period constant number := 5; -- Р’СЂРµРјСЏ СЂРµР·РµСЂРІРёСЂРѕРІР°РЅРёСЏ РїСЂРµРґР·Р°РіСЂСѓР¶РµРЅРЅС‹С… СЃРѕРѕР±С‰РµРЅРёР№.
   c_act_period constant number := 1;
   
-  -- Очереди и их параметры.
+  -- РћС‡РµСЂРµРґРё Рё РёС… РїР°СЂР°РјРµС‚СЂС‹.
   type te_queue is record(id integer,
                           hex varchar2(15),
                           qname varchar2(128),
@@ -176,18 +176,18 @@ is
   type te_queue_t is table of te_queue index by varchar2(128);
   g_queue_t te_queue_t;
   g_queue te_queue;
-  -- Период обновления параметров очереди.
+  -- РџРµСЂРёРѕРґ РѕР±РЅРѕРІР»РµРЅРёСЏ РїР°СЂР°РјРµС‚СЂРѕРІ РѕС‡РµСЂРµРґРё.
   c_queue_delay constant number := 5/86400;
   
-  -- Сообщения прочитанные с избытком.
+  -- РЎРѕРѕР±С‰РµРЅРёСЏ РїСЂРѕС‡РёС‚Р°РЅРЅС‹Рµ СЃ РёР·Р±С‹С‚РєРѕРј.
   type te_prefetch_t is table of blob index by varchar2(47);
   g_prefetch_t te_prefetch_t;
   
-  -- Активные транзакции базы данных.
+  -- РђРєС‚РёРІРЅС‹Рµ С‚СЂР°РЅР·Р°РєС†РёРё Р±Р°Р·С‹ РґР°РЅРЅС‹С….
   type te_xid_t is table of integer index by varchar2(30);
   g_xid_t te_xid_t;
   
-  -- Идентификатор сообщения.
+  -- РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ СЃРѕРѕР±С‰РµРЅРёСЏ.
   type te_id_t is table of raw(16) index by pls_integer;
   g_enq_id_t te_id_t;
   g_deq_id_t te_id_t;
@@ -237,7 +237,7 @@ is
   is
   begin
     if p_qname is null then
-      throw(1, 'Имя очереди не задано');
+      throw(1, 'РРјСЏ РѕС‡РµСЂРµРґРё РЅРµ Р·Р°РґР°РЅРѕ');
     end if;
     g_queue := null;
     begin
@@ -252,13 +252,13 @@ is
        where q.name = p_qname;
     exception
       when no_data_found then
-        throw(2, 'Очередь (' || p_qname || ') не найдена');
+        throw(2, 'РћС‡РµСЂРµРґСЊ (' || p_qname || ') РЅРµ РЅР°Р№РґРµРЅР°');
     end;
     g_queue.hex := to_char(g_queue.id, 'fm0xxxxxxxxxxxxxx');
     g_queue.qname := p_qname;
     g_queue.queue_pipe := 'QB_' || upper(g_queue.hex) || '_';
     g_queue.notify_pipe := 'QN_' || upper(g_queue.hex);
-    g_queue.expire := p_time + c_queue_delay; -- Интервал обновления параметров.
+    g_queue.expire := p_time + c_queue_delay; -- РРЅС‚РµСЂРІР°Р» РѕР±РЅРѕРІР»РµРЅРёСЏ РїР°СЂР°РјРµС‚СЂРѕРІ.
     g_queue_t(p_qname) := g_queue;
   end;
   
@@ -294,7 +294,7 @@ is
                                     coalesce(p_low_latency, 'N'), coalesce(p_enqueue, 'Y'), coalesce(p_dequeue, 'Y'));
     exception
       when dup_val_on_index then
-        throw(3, 'Очередь (' || p_qname || ') уже существует');
+        throw(3, 'РћС‡РµСЂРµРґСЊ (' || p_qname || ') СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚');
     end;
   end;
   
@@ -324,9 +324,9 @@ is
   end;
 
   /**
-   * Уведомление о новом сообщении в очереди.
-   * @param p_qname Наименование очереди.
-   * @param p_done После завершения транзакции.
+   * РЈРІРµРґРѕРјР»РµРЅРёРµ Рѕ РЅРѕРІРѕРј СЃРѕРѕР±С‰РµРЅРёРё РІ РѕС‡РµСЂРµРґРё.
+   * @param p_qname РќР°РёРјРµРЅРѕРІР°РЅРёРµ РѕС‡РµСЂРµРґРё.
+   * @param p_done РџРѕСЃР»Рµ Р·Р°РІРµСЂС€РµРЅРёСЏ С‚СЂР°РЅР·Р°РєС†РёРё.
    */
   procedure ready_notify(p_done in varchar2, p_size in pls_integer default 1)
   is
@@ -365,7 +365,7 @@ is
           raise high_enq_rate;
         end if;
       else
-        throw(4, 'При отправке сообщения в канал данных (' || l_pipe || ') получен статус (' || l_status || ')');
+        throw(4, 'РџСЂРё РѕС‚РїСЂР°РІРєРµ СЃРѕРѕР±С‰РµРЅРёСЏ РІ РєР°РЅР°Р» РґР°РЅРЅС‹С… (' || l_pipe || ') РїРѕР»СѓС‡РµРЅ СЃС‚Р°С‚СѓСЃ (' || l_status || ')');
       end if;
     end loop;
   end;
@@ -424,10 +424,10 @@ is
   begin
     init_queue(p_qname);
     if not g_queue.enqueue = 'Y' then
-      throw(5, 'Отправка сообщений отключена (' || p_qname || ')');
+      throw(5, 'РћС‚РїСЂР°РІРєР° СЃРѕРѕР±С‰РµРЅРёР№ РѕС‚РєР»СЋС‡РµРЅР° (' || p_qname || ')');
     end if;
     if p_expire < p_delay then
-      throw(6, 'Время жизни сообщений не может наступать ранее видимости');
+      throw(6, 'Р’СЂРµРјСЏ Р¶РёР·РЅРё СЃРѕРѕР±С‰РµРЅРёР№ РЅРµ РјРѕР¶РµС‚ РЅР°СЃС‚СѓРїР°С‚СЊ СЂР°РЅРµРµ РІРёРґРёРјРѕСЃС‚Рё');
     end if;
     if p_use_pipe = 'Y' then
       enq_pipe(p_payload);
@@ -456,7 +456,7 @@ is
   is
   begin
     if p_payload_array is null then
-      throw(7, 'Массив сообщений не задан');
+      throw(7, 'РњР°СЃСЃРёРІ СЃРѕРѕР±С‰РµРЅРёР№ РЅРµ Р·Р°РґР°РЅ');
     end if;
     enq_int(p_qname,
             null,
@@ -520,7 +520,7 @@ is
       dbms_pipe.unpack_message_raw(p_payload);
       return true;
     elsif l_status > 1 then
-      throw(8, 'При ожиданнии ответа из канала данных (' || p_pipe || ') получен статус (' || l_status || ')');
+      throw(8, 'РџСЂРё РѕР¶РёРґР°РЅРЅРёРё РѕС‚РІРµС‚Р° РёР· РєР°РЅР°Р»Р° РґР°РЅРЅС‹С… (' || p_pipe || ') РїРѕР»СѓС‡РµРЅ СЃС‚Р°С‚СѓСЃ (' || l_status || ')');
     end if;
     return false;
   end;
@@ -579,7 +579,7 @@ is
     l_data_t te_data_t;
     l_del_t te_id_t;
   begin 
-    -- Обработка предзагруженных сообщений.
+    -- РћР±СЂР°Р±РѕС‚РєР° РїСЂРµРґР·Р°РіСЂСѓР¶РµРЅРЅС‹С… СЃРѕРѕР±С‰РµРЅРёР№.
     if g_prefetch_t.count > 0 then
       if p_payload_id is null then
         l_idx := g_prefetch_t.next(g_queue.hex);
@@ -615,7 +615,7 @@ is
                and qd.id = l_id_t(1)
             returning qd.id bulk collect into l_deq_id_t;
           else
-            -- Проверяем сообщения.
+            -- РџСЂРѕРІРµСЂСЏРµРј СЃРѕРѕР±С‰РµРЅРёСЏ.
             forall i in indices of l_id_t
               update /*+ index(qd qeda_id_idx) */
                      t_queue_data qd
@@ -663,7 +663,7 @@ is
          order by qd.state, qd.priority, qd.enq_time for update skip locked;
       l_limit := p_size - l_n + p_prefetch;
     else
-      -- Извлечение сообщения с заданным идентификатором.
+      -- РР·РІР»РµС‡РµРЅРёРµ СЃРѕРѕР±С‰РµРЅРёСЏ СЃ Р·Р°РґР°РЅРЅС‹Рј РёРґРµРЅС‚РёС„РёРєР°С‚РѕСЂРѕРј.
       open l_c for
         select /*+ index(qd qeda_id_idx) */
                qd.qid, qd.state, qd.id, qd.payload, qd.expire_time, qd.deq_xid
@@ -677,13 +677,13 @@ is
     fetch l_c bulk collect into l_data_t limit l_limit;
     if l_data_t.count > 0 then
       if l_deq_xid is null then
-        l_deq_xid := get_xid; -- Уже есть активная транзакция.
+        l_deq_xid := get_xid; -- РЈР¶Рµ РµСЃС‚СЊ Р°РєС‚РёРІРЅР°СЏ С‚СЂР°РЅР·Р°РєС†РёСЏ.
       end if;
       for i in 1 .. l_data_t.count loop
-        if l_data_t(i).expire_time < p_deq_time then -- Истекло время жизни.
+        if l_data_t(i).expire_time < p_deq_time then -- РСЃС‚РµРєР»Рѕ РІСЂРµРјСЏ Р¶РёР·РЅРё.
           l_data_t(i).qid := -g_queue.id;
           l_data_t(i).state := c_state_expired;
-        elsif l_n < p_size or i = 1 then -- Сообщения для извлечения.
+        elsif l_n < p_size or i = 1 then -- РЎРѕРѕР±С‰РµРЅРёСЏ РґР»СЏ РёР·РІР»РµС‡РµРЅРёСЏ.
           l_n := l_n + 1;
           if p_size = 1 then
             p_payload := l_data_t(i).payload;
@@ -702,7 +702,7 @@ is
             l_data_t(i).state := c_state_dequeued;
             l_data_t(i).deq_xid := l_deq_xid;
           end if;
-        else -- Предзагруженные сообщения.
+        else -- РџСЂРµРґР·Р°РіСЂСѓР¶РµРЅРЅС‹Рµ СЃРѕРѕР±С‰РµРЅРёСЏ.
           l_data_t(i).state := c_state_dequeued;
           g_prefetch_t(g_queue.hex || rawtohex(l_data_t(i).id)) := l_data_t(i).payload;
         end if;
@@ -786,32 +786,32 @@ is
   begin
     init_queue(p_qname);
     if not g_queue.dequeue = 'Y' then
-      throw(9, 'Извлечение сообщений отключено (' || p_qname || ')');
+      throw(9, 'РР·РІР»РµС‡РµРЅРёРµ СЃРѕРѕР±С‰РµРЅРёР№ РѕС‚РєР»СЋС‡РµРЅРѕ (' || p_qname || ')');
     end if;
     if p_size < 1 then
-      throw(10, 'Число сообщений для извлечения должно быть больше нуля (' || p_size || ')');
+      throw(10, 'Р§РёСЃР»Рѕ СЃРѕРѕР±С‰РµРЅРёР№ РґР»СЏ РёР·РІР»РµС‡РµРЅРёСЏ РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ Р±РѕР»СЊС€Рµ РЅСѓР»СЏ (' || p_size || ')');
     end if;
     if p_prefetch < 1 then
-      throw(11, 'Число предзагружаемых сообщений должно быть больше нуля (' || p_prefetch || ')');
+      throw(11, 'Р§РёСЃР»Рѕ РїСЂРµРґР·Р°РіСЂСѓР¶Р°РµРјС‹С… СЃРѕРѕР±С‰РµРЅРёР№ РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ Р±РѕР»СЊС€Рµ РЅСѓР»СЏ (' || p_prefetch || ')');
     end if;
-    if p_use_pipe = 'Y' then -- Использование канала данных.
+    if p_use_pipe = 'Y' then -- РСЃРїРѕР»СЊР·РѕРІР°РЅРёРµ РєР°РЅР°Р»Р° РґР°РЅРЅС‹С….
       if not p_payload_id is null then
-        throw(12, 'Извлечение сообщения по идентификатору из канала данных не поддерживается');
+        throw(12, 'РР·РІР»РµС‡РµРЅРёРµ СЃРѕРѕР±С‰РµРЅРёСЏ РїРѕ РёРґРµРЅС‚РёС„РёРєР°С‚РѕСЂСѓ РёР· РєР°РЅР°Р»Р° РґР°РЅРЅС‹С… РЅРµ РїРѕРґРґРµСЂР¶РёРІР°РµС‚СЃСЏ');
       end if;
       deq_pipe(p_wait, p_payload);
       return;
     end if;
-    l_xid := get_xid; -- Текущая транзакция.
+    l_xid := get_xid; -- РўРµРєСѓС‰Р°СЏ С‚СЂР°РЅР·Р°РєС†РёСЏ.
     l_deq_time := systimestamp() at time zone 'utc';
-    l_wait_time := l_deq_time + numtodsinterval(p_wait, 'second'); -- Время ожидания.
-    g_deq_id_t.delete; -- Идентификаторы извлеченных сообщений.
-    loop -- Цикл извлечения сообщений.
-      if p_immediate = 'Y' or not l_xid is null then -- Немедленное извлечение или в активной транзакции.
+    l_wait_time := l_deq_time + numtodsinterval(p_wait, 'second'); -- Р’СЂРµРјСЏ РѕР¶РёРґР°РЅРёСЏ.
+    g_deq_id_t.delete; -- РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂС‹ РёР·РІР»РµС‡РµРЅРЅС‹С… СЃРѕРѕР±С‰РµРЅРёР№.
+    loop -- Р¦РёРєР» РёР·РІР»РµС‡РµРЅРёСЏ СЃРѕРѕР±С‰РµРЅРёР№.
+      if p_immediate = 'Y' or not l_xid is null then -- РќРµРјРµРґР»РµРЅРЅРѕРµ РёР·РІР»РµС‡РµРЅРёРµ РёР»Рё РІ Р°РєС‚РёРІРЅРѕР№ С‚СЂР°РЅР·Р°РєС†РёРё.
         deq_at(l_deq_time, l_xid, p_payload_id, p_immediate, p_size, p_prefetch, p_payload, p_payload_array);
       else
         deq(l_deq_time, l_xid, p_payload_id, p_immediate, p_size, p_prefetch, p_payload, p_payload_array);
       end if;
-      if g_deq_id_t.count > 0 then -- Извлечены сообщения.
+      if g_deq_id_t.count > 0 then -- РР·РІР»РµС‡РµРЅС‹ СЃРѕРѕР±С‰РµРЅРёСЏ.
         if p_immediate is null or not p_immediate = 'Y' then
           if p_size = 1 then
             delete /*+ cache_cb(qd) index(qd qeda_id_idx) */
@@ -819,7 +819,7 @@ is
              where qd.qid = g_queue.id
                and qd.id = g_deq_id_t(1);
           else
-            -- Заранее удаляем сообщения.
+            -- Р—Р°СЂР°РЅРµРµ СѓРґР°Р»СЏРµРј СЃРѕРѕР±С‰РµРЅРёСЏ.
             forall i in indices of g_deq_id_t
               delete /*+ cache_cb(qd) index(qd qeda_id_idx) */
                 from t_queue_data qd
@@ -832,14 +832,14 @@ is
       l_deq_time := systimestamp() at time zone 'utc';
       if l_deq_time >= l_wait_time then
         if not p_payload_id is null then
-          throw(13, 'Сообщение с идентификатором (' || p_payload_id || ') не найдено');
+          throw(13, 'РЎРѕРѕР±С‰РµРЅРёРµ СЃ РёРґРµРЅС‚РёС„РёРєР°С‚РѕСЂРѕРј (' || p_payload_id || ') РЅРµ РЅР°Р№РґРµРЅРѕ');
         end if;
         exit;
       end if;
-      -- Управление ожиданиеми.
-      if g_queue.low_latency = 'Y' and l_notify = 'N' then -- Активное ожидание.
+      -- РЈРїСЂР°РІР»РµРЅРёРµ РѕР¶РёРґР°РЅРёРµРјРё.
+      if g_queue.low_latency = 'Y' and l_notify = 'N' then -- РђРєС‚РёРІРЅРѕРµ РѕР¶РёРґР°РЅРёРµ.
         if l_deq_time < l_act_time then
-          dbms_lock.sleep(0.01); -- Минимальная пауза.
+          dbms_lock.sleep(0.01); -- РњРёРЅРёРјР°Р»СЊРЅР°СЏ РїР°СѓР·Р°.
         else
           l_notify := null;
         end if;
@@ -849,7 +849,7 @@ is
           l_wait := 1;
         else
           l_wait := 0;
-          if g_queue.low_latency = 'Y' and l_notify = 'N' then -- Активное ожидание.
+          if g_queue.low_latency = 'Y' and l_notify = 'N' then -- РђРєС‚РёРІРЅРѕРµ РѕР¶РёРґР°РЅРёРµ.
             l_act_time := l_deq_time + numtodsinterval(c_act_period, 'second');
           end if;
         end if;
@@ -900,9 +900,9 @@ is
   end;
   
   /**
-   * Функия контроля активности процессов и периода их запуска.
-   * @param p_name Наименование процесса.
-   * @param p_next_time Время следующего запуска.
+   * Р¤СѓРЅРєРёСЏ РєРѕРЅС‚СЂРѕР»СЏ Р°РєС‚РёРІРЅРѕСЃС‚Рё РїСЂРѕС†РµСЃСЃРѕРІ Рё РїРµСЂРёРѕРґР° РёС… Р·Р°РїСѓСЃРєР°.
+   * @param p_name РќР°РёРјРµРЅРѕРІР°РЅРёРµ РїСЂРѕС†РµСЃСЃР°.
+   * @param p_next_time Р’СЂРµРјСЏ СЃР»РµРґСѓСЋС‰РµРіРѕ Р·Р°РїСѓСЃРєР°.
    */
   function active(p_name in varchar2, 
                   p_next_time in out nocopy timestamp) return boolean
@@ -972,14 +972,14 @@ is
           fetch l_c bulk collect into l_data_list limit 128;
           exit when l_data_list.count = 0;
           if l_load_xid is null then
-            load_xid_t; -- Загрузка активных транзакций.
+            load_xid_t; -- Р—Р°РіСЂСѓР·РєР° Р°РєС‚РёРІРЅС‹С… С‚СЂР°РЅР·Р°РєС†РёР№.
             l_load_xid := 'Y';
           end if;
           for i in 1 .. l_data_list.count loop
             l_time := systimestamp() at time zone 'utc';
             l_prefetch_time := l_time - numtodsinterval(c_prefetch_period, 'second');
-            if l_data_list(i).deq_xid is null then -- Предзагруженное сообщение.
-              if l_data_list(i).deq_time < l_prefetch_time then -- Время резерва истекло.
+            if l_data_list(i).deq_xid is null then -- РџСЂРµРґР·Р°РіСЂСѓР¶РµРЅРЅРѕРµ СЃРѕРѕР±С‰РµРЅРёРµ.
+              if l_data_list(i).deq_time < l_prefetch_time then -- Р’СЂРµРјСЏ СЂРµР·РµСЂРІР° РёСЃС‚РµРєР»Рѕ.
                 begin
                   select /*+ index(qd qeda_id_idx) */
                          null
@@ -993,11 +993,11 @@ is
                   l_ready := l_ready + 1;
                 exception
                   when no_data_found then
-                    l_data_list.delete(i); -- Заблокировно (пропускаем).
+                    l_data_list.delete(i); -- Р—Р°Р±Р»РѕРєРёСЂРѕРІРЅРѕ (РїСЂРѕРїСѓСЃРєР°РµРј).
                 end;
               end if;
-            elsif check_xid(l_data_list(i).deq_xid) = 'Y' then -- Транзакция активна.
-              l_data_list.delete(i); -- Заблокировано (пропускаем).
+            elsif check_xid(l_data_list(i).deq_xid) = 'Y' then -- РўСЂР°РЅР·Р°РєС†РёСЏ Р°РєС‚РёРІРЅР°.
+              l_data_list.delete(i); -- Р—Р°Р±Р»РѕРєРёСЂРѕРІР°РЅРѕ (РїСЂРѕРїСѓСЃРєР°РµРј).
             else
               init_queue(l_queue_s.name);
               if l_data_list(i).deq_try is null then
@@ -1008,7 +1008,7 @@ is
               if l_data_list(i).expire_time < l_time or l_data_list(i).deq_try >= g_queue.try_count then
                 l_data_list(i).qid := -l_queue_s.id;
                 l_data_list(i).state := c_state_expired;
-              else -- Повторная попытка.
+              else -- РџРѕРІС‚РѕСЂРЅР°СЏ РїРѕРїС‹С‚РєР°.
                 l_data_list(i).state := c_state_ready;
                 l_data_list(i).enq_time := l_time;
                 if g_queue.try_delay > 0 then
