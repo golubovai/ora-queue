@@ -9,7 +9,7 @@ is
   type te_payload_t is table of blob;
   
   /**
-   * Регистрация новой очереди.
+   * Создание новой очереди (автономная транзакция).
    * @param p_qname Наименование очереди.
    * @param p_comment Комментарий.
    * @param p_try_count Максимальное число попыток извлечений.
@@ -27,12 +27,23 @@ is
                      p_dequeue in varchar2 default 'Y');
   
   /**
+   * Удаление очереди (автономная транзакция).
+   * @param p_qname Наименование очереди.
+   *
+   * NB: Очередь становится недоступной в течение 5с после завершения транзакции.
+   *     Очистка данных очереди выполняется асинхронно через 15с после удаления.
+   */
+  procedure drop_q(p_qname in varchar2);
+  
+  /**
    * Обновление параметров очереди.
    * @param p_qname Наименование очереди.
    * @param p_comment Комментарий.
    * @param p_try_count Максимальное число попыток извлечений.
    * @param p_try_delay Задержка повторной попытки извлечения.
    * @param p_low_latency Минимальная задержка извлечения.
+   *
+   * NB: Параметры вступают в силу в течение 5с после завершения транзакции.
    */
   procedure update_q(p_qname in varchar2,
                      p_comment in varchar2 default null,
@@ -45,16 +56,12 @@ is
    * @param p_qname Наименование очереди.
    * @param p_enqueue Статус отправки (Y/N).
    * @param p_dequeue Статус получения (Y/N).
+   *
+   * NB: Параметры вступают в силу в течение 5с после завершения транзакции.
    */
   procedure enable_q(p_qname in varchar2,
                      p_enqueue in varchar2 default 'Y',
                      p_dequeue in varchar2 default 'Y');
-  
-  /**
-   * Удаление очереди.
-   * @param p_qname Наименование очереди.
-   */
-  procedure drop_q(p_qname in varchar2, p_wait in pls_integer default 5);
   
   /**
    * Отправка массива сообщений в очередь (канал данных не поддерживается).
@@ -91,7 +98,7 @@ is
                 p_expire in number default 0);
   
   /**
-   * Получить идентификаторы отправленных сообщений.
+   * Получение идентификатора отправленных сообщений.
    * @param p_id Порядковый номер сообщения (для массива).
    * @return Идентификатор отправленного сообщения.
    */
@@ -102,6 +109,7 @@ is
    * @param p_qname Наименование очереди.
    * @param p_wait Время ожидания сообщений.
    * @param p_payload_array Массив сообщений.
+   * @param p_except Очередь исключения.
    * @param p_immediate Немедленное извлечение из очереди (автономная транзакция).
    * @param p_size Число сообщений для извлечения.
    * @param p_prefetch Число предзагружаемых сообщений в сессии (оптимизация чтения).
@@ -109,6 +117,7 @@ is
   procedure deq_array(p_qname in varchar2, 
                       p_wait in number,
                       p_payload_array out nocopy te_payload_t,
+                      p_except in varchar2 default 'N',
                       p_immediate in varchar2 default 'N',
                       p_size in pls_integer default 1,
                       p_prefetch in pls_integer default 1);
@@ -119,6 +128,7 @@ is
    * @param p_wait Время ожидания сообщения.
    * @param p_payload Сообщение.
    * @param p_payload_id Заданный идентификатор сообщения.
+   * @param p_except Очередь исключения.
    * @param p_use_pipe Использование канала данных.
    * @param p_immediate Немедленное извлечение из очереди (автономная транзакция).
    * @param p_prefetch Число предзагружаемых сообщений в сессии (оптимизация чтения).
@@ -127,12 +137,13 @@ is
                 p_wait in number,
                 p_payload out nocopy blob,
                 p_payload_id in raw default null,
+                p_except in varchar2 default 'N',
                 p_use_pipe in varchar2 default 'N',
                 p_immediate in varchar2 default 'N',
                 p_prefetch in pls_integer default 1);
   
   /**
-   * Получить идентификаторы извлеченных сообщений.
+   * Получение идентификатора извлеченных сообщений.
    * @param p_id Порядковый номер сообщения (для массива).
    * @return Идентификатор извлеченного сообщения.
    */
@@ -184,6 +195,7 @@ is
   -- Очереди и их параметры.
   type te_queue is record(id integer,
                           hex varchar2(15),
+                          ehex varchar2(15),
                           qname varchar2(128),
                           queue_pipe varchar2(128),
                           notify_pipe varchar2(128),
@@ -198,6 +210,8 @@ is
   g_queue te_queue;
   -- Период обновления параметров очереди.
   c_queue_delay constant number := 5/86400;
+  -- Задержка очистки данных очереди при удалении.
+  c_clean_delay constant number := 15/86400;
   
   -- Сообщения прочитанные с избытком.
   type te_prefetch_t is table of blob index by varchar2(47);
@@ -212,12 +226,23 @@ is
   g_enq_id_t te_id_t;
   g_deq_id_t te_id_t;
   
+  /**
+   * Вызов исключения.
+   * @param p_n Порядковый номер ошибки от базового 20200.
+   * @param p_message Текст ошибки.
+   */
   procedure throw(p_n in integer, p_message in varchar2)
   is
   begin
     raise_application_error(-20200 - p_n, p_message, true);
   end;
   
+  /**
+   * Получение интервала между двумя моментами времени в секундах.
+   * @param p_a Момент времени A.
+   * @param p_b Момент времени B.
+   * @return Интервал между двумя моментами времени в секундах.
+   */
   function secs(p_a in timestamp, p_b in timestamp) return number
   is
   begin
@@ -227,6 +252,11 @@ is
            extract(second from (p_a - p_b));
   end;
   
+  /**
+   * Установка параметра сессии.
+   * @param p_name Наименование параметра.
+   * @param p_value Значение параметра.
+   */
   function set_parameter(p_name in varchar2, p_value in varchar2) return varchar2
   is
     l_value varchar2(4000);
@@ -248,6 +278,10 @@ is
     return l_value;
   end;
   
+  /**
+   * Исполнение sql-команды.
+   * @param p_wait Время ожидания для ddl-команд.
+   */
   procedure exe_at(p_sql in varchar2, p_wait in pls_integer default 0)
   is
     l_value varchar2(4000);
@@ -264,22 +298,35 @@ is
       raise;
   end;
   
+  /**
+   * Загрузка активного списка транзакций.
+   */
   procedure load_xid_t
   is
   begin
     g_xid_t.delete;
-    for i in (select to_char(xidusn) || to_char(xidslot) || to_char(xidsqn) xid 
-                from v$transaction) loop
+    for i in (select to_char(xidusn) || '.' || to_char(xidslot) || '.' || to_char(xidsqn) xid 
+                from v$transaction) 
+    loop
       g_xid_t(i.xid) := null;
     end loop;
   end;
   
+  /**
+   * Получение идентификатора активной транзакции в сессии.
+   * @param p_create Открыть транзакцию при отсутствии.
+   * @return Идентификатор активной транзакции в сессии.
+   */
   function get_xid(p_create in boolean default false) return varchar2
   is
   begin
     return dbms_transaction.local_transaction_id(p_create);
   end;
   
+  /**
+   * Проверка наличия идентификатора транзакции в списке активных транзакций.
+   * @param p_xid Идентификатор транзакции (usn.slot.seq).
+   */
   function check_xid(p_xid in varchar2) return varchar2
   is
   begin
@@ -290,8 +337,14 @@ is
     end if;
   end;
   
+  /**
+   * Загрузка данных очереди.
+   * @param p_qname Наименование очереди.
+   * @param p_time Время загрузки.
+   */
   procedure load_queue(p_qname in varchar2, p_time in date)
   is
+    l_hex varchar2(15);
   begin
     if p_qname is null then
       throw(1, 'Имя очереди не задано');
@@ -311,7 +364,9 @@ is
       when no_data_found then
         throw(2, 'Очередь (' || p_qname || ') не найдена');
     end;
-    g_queue.hex := to_char(g_queue.id, 'fm0xxxxxxxxxxxxxx');
+    l_hex := to_char(g_queue.id, 'fm0xxxxxxxxxxxxx');
+    g_queue.hex := '+' || l_hex;
+    g_queue.ehex := '-' || l_hex;
     g_queue.qname := p_qname;
     g_queue.queue_pipe := 'QB_' || upper(g_queue.hex) || '_';
     g_queue.notify_pipe := 'QN_' || upper(g_queue.hex);
@@ -319,6 +374,10 @@ is
     g_queue_t(p_qname) := g_queue;
   end;
   
+  /**
+   * Инициализация данных очереди.
+   * @param p_qname Наименование очереди.
+   */
   procedure init_queue(p_qname in varchar2)
   is
     c_time constant date := sysdate;
@@ -346,15 +405,40 @@ is
                      p_dequeue in varchar2 default 'Y')
   is
     c_id constant number := seq_qid.nextval;
+    pragma autonomous_transaction;
   begin
     insert into t_queue(id, name, comment_, try_count, try_delay, low_latency, enqueue, dequeue) 
          values (c_id, p_qname, p_comment, coalesce(p_try_count, 5), coalesce(p_try_delay, 0), 
                                 coalesce(p_low_latency, 'N'), coalesce(p_enqueue, 'Y'), coalesce(p_dequeue, 'Y'));
-    -- Создание партиции.
+    -- Создание партиции самой очереди и очереди исключений.
     exe_at('alter table "' || c_schema || '"."' || c_data_table || '" add partition "SYS_P' || c_id || '" values (' || c_id || ', ' || -c_id || ')');
+    commit;
   exception
     when dup_val_on_index then
       throw(3, 'Очередь (' || p_qname || ') уже существует');
+  end;
+  
+  procedure drop_q(p_qname in varchar2)
+  is
+    l_id integer;
+    pragma autonomous_transaction;
+  begin
+    init_queue(p_qname);
+    if g_queue.enqueue = 'Y' then
+      throw(4, 'Отправка сообщений должна быть отключена (' || p_qname || ')');
+    end if;
+    if g_queue.dequeue = 'Y' then
+      throw(5, 'Извлечение сообщений должно быть отключено (' || p_qname || ')');
+    end if;
+    delete from t_queue where id = g_queue.id returning id into l_id;
+    if l_id is null then
+      g_queue := null;
+      g_queue_t.delete(p_qname);
+      throw(6, 'Очередь (' || p_qname || ') не найдена');
+    end if;
+    -- Асинхронная очистка данных.
+    insert into t_queue_drop values (l_id, p_qname, sysdate + c_clean_delay);
+    commit;
   end;
   
   procedure update_q(p_qname in varchar2,
@@ -363,6 +447,7 @@ is
                      p_try_delay in number default null,
                      p_low_latency in varchar2 default null)
   is
+    l_id number;
   begin
     init_queue(p_qname);
     update t_queue q
@@ -370,44 +455,36 @@ is
            q.try_count = coalesce(p_try_count, q.try_count),
            q.try_delay = coalesce(p_try_delay, q.try_delay),
            q.low_latency = coalesce(p_low_latency, q.low_latency)
-     where q.id = g_queue.id;
+     where q.id = g_queue.id returning id into l_id;
+    if l_id is null then
+      g_queue := null;
+      g_queue_t.delete(p_qname);
+      throw(7, 'Очередь (' || p_qname || ') не найдена');
+    end if;
   end;
   
   procedure enable_q(p_qname in varchar2,
                      p_enqueue in varchar2 default 'Y',
                      p_dequeue in varchar2 default 'Y')
   is
+    l_id number;
   begin
     init_queue(p_qname);
     update t_queue q
        set q.enqueue = coalesce(p_enqueue, q.enqueue),
            q.dequeue = coalesce(p_dequeue, q.dequeue)
-     where q.id = g_queue.id;
-  end;
-  
-  procedure drop_q(p_qname in varchar2, p_wait in pls_integer default 5)
-  is
-    l_status integer;
-  begin
-    init_queue(p_qname);
-    if g_queue.enqueue = 'Y' then
-      throw(5, 'Отправка сообщений должна быть отключена (' || p_qname || ')');
+     where q.id = g_queue.id returning id into l_id;
+    if l_id is null then
+      g_queue := null;
+      g_queue_t.delete(p_qname);
+      throw(8, 'Очередь (' || p_qname || ') не найдена');
     end if;
-    if g_queue.dequeue = 'Y' then
-      throw(9, 'Извлечение сообщений должно быть отключено (' || p_qname || ')');
-    end if;
-    delete from t_queue where id = g_queue.id;
-    dbms_pipe.purge(g_queue.notify_pipe);
-    l_status := dbms_pipe.remove_pipe(g_queue.notify_pipe);
-    dbms_pipe.purge(g_queue.queue_pipe);
-    l_status := dbms_pipe.remove_pipe(g_queue.queue_pipe);
-    exe_at('alter table "' || c_schema || '"."' || c_data_table || '" drop partition SYS_P' || g_queue.id, p_wait => p_wait);
   end;
 
   /**
    * Уведомление о новом сообщении в очереди.
    * @param p_qname Наименование очереди.
-   * @param p_done После завершения транзакции.
+   * @param p_size Количество уведомлений.
    */
   procedure ready_notify(p_done in varchar2, p_size in pls_integer default 1)
   is
@@ -420,6 +497,10 @@ is
     end loop;
   end;
   
+  /**
+   * Отправка сообщения в канал данных.
+   * @param p_payload Сообщение.
+   */
   procedure enq_pipe(p_payload in blob)
   is
     l_enq_time timestamp(6);
@@ -446,11 +527,20 @@ is
           raise high_enq_rate;
         end if;
       else
-        throw(4, 'При отправке сообщения в канал данных (' || l_pipe || ') получен статус (' || l_status || ')');
+        throw(9, 'При отправке сообщения в канал данных (' || l_pipe || ') получен статус (' || l_status || ')');
       end if;
     end loop;
   end;
-
+  
+  /**
+   * Отправка сообщения.
+   * @param p_priority Приоритет сообщения.
+   * @param p_enq_time Время отправки.
+   * @param p_payload Сообщение.
+   * @param p_payload_array Массив сообщений.
+   * @param p_expire_time Момент окончания жизни сообщения.
+   * @param p_notify Уведомление о новом сообщении.
+   */
   procedure enq(p_priority in integer,
                 p_enq_time in timestamp,
                 p_payload in blob,
@@ -474,6 +564,14 @@ is
     end if;
   end;
   
+  /**
+   * Отправка сообщения в автономной транзакции.
+   * @param p_priority Приоритет сообщения.
+   * @param p_enq_time Время отправки.
+   * @param p_payload Сообщение.
+   * @param p_payload_array Массив сообщений.
+   * @param p_expire_time Момент окончания жизни сообщения.
+   */
   procedure enq_at(p_priority in integer,
                    p_enq_time in timestamp,
                    p_payload in blob,
@@ -491,6 +589,17 @@ is
     end if;
   end;
   
+  /**
+   * Внутренний метод отправки сообщения.
+   * @param p_qname Наименование очереди.
+   * @param p_payload Сообщение.
+   * @param p_payload_array Массив сообщений.
+   * @param p_use_pipe Использование канала данных.
+   * @param p_immediate Немедленное извлечение из очереди (автономная транзакция).
+   * @param p_priority Приоритет сообщения.
+   * @param p_delay Задержка видимости сообщения.
+   * @param p_expire Время жизни сообщения.
+   */
   procedure enq_int(p_qname in varchar2,
                     p_payload in blob,
                     p_payload_array in te_payload_t,
@@ -505,10 +614,10 @@ is
   begin
     init_queue(p_qname);
     if not g_queue.enqueue = 'Y' then
-      throw(5, 'Отправка сообщений отключена (' || p_qname || ')');
+      throw(10, 'Отправка сообщений отключена (' || p_qname || ')');
     end if;
     if p_expire < p_delay then
-      throw(6, 'Время жизни сообщений не может наступать ранее видимости');
+      throw(11, 'Время жизни сообщений не может наступать ранее видимости');
     end if;
     if p_use_pipe = 'Y' then
       enq_pipe(p_payload);
@@ -537,7 +646,7 @@ is
   is
   begin
     if p_payload_array is null then
-      throw(7, 'Массив сообщений не задан');
+      throw(12, 'Массив сообщений не задан');
     end if;
     enq_int(p_qname,
             null,
@@ -579,6 +688,10 @@ is
     end if;
   end;
   
+  /**
+   * Ожидание уведомления о новом сообщении в очереди.
+   * @param p_wait Время ожидания (сек).
+   */
   function wait_notify(p_wait in number) return varchar2
   is
     l_status integer;
@@ -601,11 +714,16 @@ is
       dbms_pipe.unpack_message_raw(p_payload);
       return true;
     elsif l_status > 1 then
-      throw(8, 'При ожиданнии ответа из канала данных (' || p_pipe || ') получен статус (' || l_status || ')');
+      throw(13, 'При ожиданнии ответа из канала данных (' || p_pipe || ') получен статус (' || l_status || ')');
     end if;
     return false;
   end;
   
+  /**
+   * Извлечение сообщения из канала данных.
+   * @param p_wait Время ожидания (сек).
+   * @param p_payload Сообщение.
+   */
   procedure deq_pipe(p_wait in number, p_payload out nocopy blob)
   is
     l_deq_time timestamp(6);
@@ -633,7 +751,9 @@ is
     end loop;
   end;
   
-  procedure deq(p_deq_time in timestamp,
+  procedure deq(p_qid in integer,
+                p_hex in varchar2,
+                p_deq_time in timestamp,
                 p_xid in varchar2,
                 p_payload_id in raw,
                 p_immediate in varchar2,
@@ -645,6 +765,7 @@ is
     l_limit pls_integer;
     type te_data is record(qid integer, 
                            state integer, 
+                           enq_time timestamp(6),
                            id raw(16), 
                            payload blob, 
                            expire_time timestamp(6), 
@@ -656,22 +777,23 @@ is
     l_prefetch_time timestamp(6);
     l_deq_xid varchar2(30) := p_xid;
     l_deq_id_t te_id_t;
+    l_state integer;
     l_c sys_refcursor;
     l_data_t te_data_t;
     l_del_t te_id_t;
   begin 
-    -- Обработка предзагруженных сообщений.
+    -- Обработка предзагруженных сообщений.  
     if g_prefetch_t.count > 0 then
       if p_payload_id is null then
-        l_idx := g_prefetch_t.next(g_queue.hex);
+        l_idx := g_prefetch_t.next(p_hex);
       else
-        l_idx := g_queue.hex || hextoraw(p_payload_id);
+        l_idx := p_hex || rawtohex(p_payload_id);
         if not g_prefetch_t.exists(l_idx) then
           l_idx := null;
         end if;
       end if;
       loop
-        exit when l_idx is null or not substr(l_idx, 1, 15) = g_queue.hex;
+        exit when l_idx is null or not substr(l_idx, 1, 15) = p_hex;
         l_id_t(l_id_t.count + 1) := coalesce(p_payload_id, hextoraw(substr(l_idx, 16)));
         if p_payload_id is null then
           l_idx := g_prefetch_t.next(l_idx);
@@ -689,7 +811,7 @@ is
             update /*+ index(qd qeda_id_idx) */
                    t_queue_data qd
                set qd.deq_xid = l_deq_xid
-             where qd.qid = g_queue.id
+             where qd.qid = p_qid
                and qd.state = c_state_dequeued
                and (qd.expire_time is null or qd.expire_time >= p_deq_time)
                and qd.deq_time >= l_prefetch_time
@@ -701,7 +823,7 @@ is
               update /*+ index(qd qeda_id_idx) */
                      t_queue_data qd
                  set qd.deq_xid = l_deq_xid
-               where qd.qid = g_queue.id
+               where qd.qid = p_qid
                  and qd.state = c_state_dequeued
                  and (qd.expire_time is null or qd.expire_time >= p_deq_time)
                  and qd.deq_time >= l_prefetch_time
@@ -712,19 +834,19 @@ is
             for i in 1 .. l_deq_id_t.count loop
               l_n := l_n + 1;
               if p_size = 1 then
-                p_payload := g_prefetch_t(g_queue.hex || rawtohex(l_deq_id_t(i)));
+                p_payload := g_prefetch_t(p_hex || rawtohex(l_deq_id_t(i)));
               else
                 if p_payload_array is null then
                   p_payload_array := te_payload_t();
                 end if;
                 p_payload_array.extend;
-                p_payload_array(l_n) := g_prefetch_t(g_queue.hex || rawtohex(l_deq_id_t(i)));
+                p_payload_array(l_n) := g_prefetch_t(p_hex || rawtohex(l_deq_id_t(i)));
               end if;
               g_deq_id_t(l_n) := l_deq_id_t(i);
             end loop;
           end if;
           for i in 1 .. l_id_t.count loop
-            g_prefetch_t.delete(g_queue.hex || rawtohex(l_id_t(i)));
+            g_prefetch_t.delete(p_hex || rawtohex(l_id_t(i)));
           end loop;
           if l_n >= p_size then
             return;
@@ -733,13 +855,18 @@ is
         end if;
       end loop;
     end if;
+    if p_qid > 0 then
+      l_state := c_state_ready;
+    else
+      l_state := c_state_expired;
+    end if;
     if p_payload_id is null then
       open l_c for
         select /*+ index_asc(qd qeda_sepyee_idx) */
-               qd.qid, qd.state, qd.id, qd.payload, qd.expire_time, qd.deq_xid
+               qd.qid, qd.state, qd.enq_time, qd.id, qd.payload, qd.expire_time, qd.deq_xid
           from t_queue_data qd
-         where qd.qid = g_queue.id
-           and qd.state = c_state_ready
+         where qd.qid = p_qid
+           and qd.state = l_state
            and qd.enq_time <= p_deq_time
          order by qd.state, qd.priority, qd.enq_time for update skip locked;
       l_limit := p_size - l_n + p_prefetch;
@@ -747,11 +874,11 @@ is
       -- Извлечение сообщения с заданным идентификатором.
       open l_c for
         select /*+ index(qd qeda_id_idx) */
-               qd.qid, qd.state, qd.id, qd.payload, qd.expire_time, qd.deq_xid
+               qd.qid, qd.state, qd.enq_time, qd.id, qd.payload, qd.expire_time, qd.deq_xid
           from t_queue_data qd
-         where qd.qid = g_queue.id
+         where qd.qid = p_qid
            and qd.id = p_payload_id
-           and qd.state = c_state_ready
+           and qd.state = l_state
            and qd.enq_time <= p_deq_time for update skip locked;
       l_limit := 1;
     end if;
@@ -761,9 +888,10 @@ is
         l_deq_xid := get_xid; -- Уже есть активная транзакция.
       end if;
       for i in 1 .. l_data_t.count loop
-        if l_data_t(i).expire_time < p_deq_time then -- Истекло время жизни.
-          l_data_t(i).qid := -g_queue.id;
+        if p_qid > 0 and l_data_t(i).expire_time < p_deq_time then -- Истекло время жизни (только для нормальной очереди).
+          l_data_t(i).qid := -p_qid;
           l_data_t(i).state := c_state_expired;
+          l_data_t(i).enq_time := p_deq_time;
         elsif l_n < p_size or i = 1 then -- Сообщения для извлечения.
           l_n := l_n + 1;
           if p_size = 1 then
@@ -785,19 +913,19 @@ is
           end if;
         else -- Предзагруженные сообщения.
           l_data_t(i).state := c_state_dequeued;
-          g_prefetch_t(g_queue.hex || rawtohex(l_data_t(i).id)) := l_data_t(i).payload;
+          g_prefetch_t(p_hex || rawtohex(l_data_t(i).id)) := l_data_t(i).payload;
         end if;
       end loop;
       if l_del_t.count = 1 then
         delete  /*+ index(qd qeda_id_idx) */
           from t_queue_data qd
-         where qd.qid = g_queue.id 
+         where qd.qid = p_qid 
            and qd.id = l_del_t(1);
       elsif l_del_t.count > 1 then
         forall i in indices of l_del_t
           delete  /*+ index(qd qeda_id_idx) */
             from t_queue_data qd
-           where qd.qid = g_queue.id 
+           where qd.qid = p_qid 
              and qd.id = l_del_t(i);
       end if;
       if l_data_t.count = 1 then
@@ -805,9 +933,10 @@ is
                t_queue_data qd
            set qd.qid = l_data_t(1).qid,
                qd.state = l_data_t(1).state,
+               qd.enq_time = l_data_t(1).enq_time,
                qd.deq_xid = l_data_t(1).deq_xid,
                qd.deq_time = p_deq_time
-         where qd.qid = g_queue.id 
+         where qd.qid = p_qid 
            and qd.id = l_data_t(1).id;
       elsif l_data_t.count > 1 then
         forall i in indices of l_data_t
@@ -815,9 +944,10 @@ is
                  t_queue_data qd
              set qd.qid = l_data_t(i).qid,
                  qd.state = l_data_t(i).state,
+                 qd.enq_time = l_data_t(i).enq_time,
                  qd.deq_xid = l_data_t(i).deq_xid,
                  qd.deq_time = p_deq_time
-           where qd.qid = g_queue.id 
+           where qd.qid = p_qid 
              and qd.id = l_data_t(i).id;
       end if;
     end if;
@@ -833,7 +963,9 @@ is
       raise;
   end;
   
-  procedure deq_at(p_deq_time in timestamp, 
+  procedure deq_at(p_qid in integer,
+                   p_hex in varchar2,
+                   p_deq_time in timestamp, 
                    p_xid in varchar2,
                    p_payload_id in raw,
                    p_immediate in varchar2,
@@ -844,7 +976,7 @@ is
   is
     pragma autonomous_transaction;
   begin
-    deq(p_deq_time, p_xid, p_payload_id, p_immediate, p_size, p_prefetch, p_payload, p_payload_array);
+    deq(p_qid, p_hex, p_deq_time, p_xid, p_payload_id, p_immediate, p_size, p_prefetch, p_payload, p_payload_array);
     commit;
   end;
   
@@ -853,31 +985,37 @@ is
                     p_payload out nocopy blob,
                     p_payload_array out nocopy te_payload_t,
                     p_payload_id in raw,
+                    p_except in varchar2,
                     p_use_pipe in varchar2,
                     p_immediate in varchar2,
                     p_size in pls_integer,
                     p_prefetch in pls_integer)
   is
     l_xid varchar2(30);
-    l_wait_time timestamp(6);
     l_deq_time timestamp(6);
+    l_wait_time timestamp(6);
+    l_qid integer;
+    l_hex varchar2(15);
     l_notify varchar2(1);
     l_wait number := 0;
     l_act_time timestamp(6);
   begin
     init_queue(p_qname);
     if not g_queue.dequeue = 'Y' then
-      throw(9, 'Извлечение сообщений отключено (' || p_qname || ')');
+      throw(14, 'Извлечение сообщений отключено (' || p_qname || ')');
     end if;
     if p_size < 1 then
-      throw(10, 'Число сообщений для извлечения должно быть больше нуля (' || p_size || ')');
+      throw(15, 'Число сообщений для извлечения должно быть больше нуля (' || p_size || ')');
     end if;
     if p_prefetch < 1 then
-      throw(11, 'Число предзагружаемых сообщений должно быть больше нуля (' || p_prefetch || ')');
+      throw(16, 'Число предзагружаемых сообщений должно быть больше нуля (' || p_prefetch || ')');
     end if;
     if p_use_pipe = 'Y' then -- Использование канала данных.
+      if p_except = 'Y' then
+        throw(17, 'Извлечение сообщений очереди исключений из канала данных не поддерживается');
+      end if;
       if not p_payload_id is null then
-        throw(12, 'Извлечение сообщения по идентификатору из канала данных не поддерживается');
+        throw(18, 'Извлечение сообщения по идентификатору из канала данных не поддерживается');
       end if;
       deq_pipe(p_wait, p_payload);
       return;
@@ -885,26 +1023,33 @@ is
     l_xid := get_xid; -- Текущая транзакция.
     l_deq_time := systimestamp() at time zone 'utc';
     l_wait_time := l_deq_time + numtodsinterval(p_wait, 'second'); -- Время ожидания.
+    if p_except = 'Y' then
+      l_qid := -g_queue.id;
+      l_hex := g_queue.ehex;
+    else
+      l_qid := g_queue.id;
+      l_hex := g_queue.hex;
+    end if;
     g_deq_id_t.delete; -- Идентификаторы извлеченных сообщений.
     loop -- Цикл извлечения сообщений.
       if p_immediate = 'Y' or not l_xid is null then -- Немедленное извлечение или в активной транзакции.
-        deq_at(l_deq_time, l_xid, p_payload_id, p_immediate, p_size, p_prefetch, p_payload, p_payload_array);
+        deq_at(l_qid, l_hex, l_deq_time, l_xid, p_payload_id, p_immediate, p_size, p_prefetch, p_payload, p_payload_array);
       else
-        deq(l_deq_time, l_xid, p_payload_id, p_immediate, p_size, p_prefetch, p_payload, p_payload_array);
+        deq(l_qid, l_hex, l_deq_time, l_xid, p_payload_id, p_immediate, p_size, p_prefetch, p_payload, p_payload_array);
       end if;
       if g_deq_id_t.count > 0 then -- Извлечены сообщения.
         if p_immediate is null or not p_immediate = 'Y' then
           if p_size = 1 then
             delete /*+ cache_cb(qd) index(qd qeda_id_idx) */
               from t_queue_data qd
-             where qd.qid = g_queue.id
+             where qd.qid = l_qid
                and qd.id = g_deq_id_t(1);
           else
             -- Заранее удаляем сообщения.
             forall i in indices of g_deq_id_t
               delete /*+ cache_cb(qd) index(qd qeda_id_idx) */
                 from t_queue_data qd
-               where qd.qid = g_queue.id
+               where qd.qid = l_qid
                  and qd.id = g_deq_id_t(i);
           end if;
         end if;
@@ -913,7 +1058,7 @@ is
       l_deq_time := systimestamp() at time zone 'utc';
       if l_deq_time >= l_wait_time then
         if not p_payload_id is null then
-          throw(13, 'Сообщение с идентификатором (' || p_payload_id || ') не найдено');
+          throw(19, 'Сообщение с идентификатором (' || p_payload_id || ') не найдено');
         end if;
         exit;
       end if;
@@ -941,6 +1086,7 @@ is
   procedure deq_array(p_qname in varchar2, 
                       p_wait in number,
                       p_payload_array out nocopy te_payload_t,
+                      p_except in varchar2 default 'N',
                       p_immediate in varchar2 default 'N',
                       p_size in pls_integer default 1,
                       p_prefetch in pls_integer default 1)
@@ -949,7 +1095,7 @@ is
     c_prefetch constant pls_integer := coalesce(p_prefetch, 1);
     l_payload blob;
   begin
-    deq_int(p_qname, p_wait, l_payload, p_payload_array, null, 'N', p_immediate, c_size, c_prefetch);
+    deq_int(p_qname, p_wait, l_payload, p_payload_array, null, p_except, 'N', p_immediate, c_size, c_prefetch);
     if c_size = 1 then
       p_payload_array := te_payload_t(l_payload);
     end if;
@@ -959,6 +1105,7 @@ is
                 p_wait in number,
                 p_payload out nocopy blob,
                 p_payload_id in raw default null,
+                p_except in varchar2 default 'N',
                 p_use_pipe in varchar2 default 'N',
                 p_immediate in varchar2 default 'N',
                 p_prefetch in pls_integer default 1)
@@ -966,7 +1113,7 @@ is
     c_prefetch constant pls_integer := coalesce(p_prefetch, 1);
     l_payload_array te_payload_t;
   begin
-    deq_int(p_qname, p_wait, p_payload, l_payload_array, p_payload_id, p_use_pipe, p_immediate, 1, c_prefetch);
+    deq_int(p_qname, p_wait, p_payload, l_payload_array, p_payload_id, p_except, p_use_pipe, p_immediate, 1, c_prefetch);
   end;
   
   function deq_id(p_id in pls_integer default 1) return raw
@@ -995,7 +1142,7 @@ is
   end;
   
   /**
-   * Функия контроля активности процессов и периода их запуска.
+   * Функия контроля активности процессов и периода запуска.
    * @param p_name Наименование процесса.
    * @param p_next_time Время следующего запуска.
    */
@@ -1039,7 +1186,7 @@ is
     type te_data_list is table of te_data;
     l_next_time timestamp(6);
     l_queue_list te_queue_list;
-    l_queue_s te_queue_s;
+    l_queue te_queue_s;
     l_c sys_refcursor;
     l_data_list te_data_list;
     l_ready pls_integer;
@@ -1055,12 +1202,12 @@ is
         select id, name bulk collect into l_queue_list from t_queue where name = p_qname;
       end if;
       for q in 1 .. l_queue_list.count loop
-        l_queue_s := l_queue_list(q);
+        l_queue := l_queue_list(q);
         open l_c for 
           select /*+ index_asc(qd qeda_sepyee_idx) */
                  qd.qid, qd.state, qd.enq_time, qd.id, qd.expire_time, qd.deq_try, qd.deq_xid, qd.deq_time
             from t_queue_data qd
-           where qd.qid = l_queue_s.id
+           where qd.qid in (l_queue.id, -l_queue.id)
              and qd.state = c_state_dequeued;
         l_ready := 0;
         loop
@@ -1080,28 +1227,29 @@ is
                          null
                     into l_dummy
                     from t_queue_data qd 
-                   where qd.qid = l_queue_s.id 
+                   where qd.qid = l_data_list(i).qid 
                      and qd.id = l_data_list(i).id
                      and qd.state = c_state_dequeued
+                     and qd.deq_time < l_prefetch_time
                      and qd.deq_xid is null for update skip locked;
                   l_data_list(i).state := c_state_ready;
                   l_ready := l_ready + 1;
                 exception
                   when no_data_found then
-                    l_data_list.delete(i); -- Заблокировно (пропускаем).
+                    l_data_list.delete(i); -- Заблокировно или не соответствует условиям (пропускаем).
                 end;
               end if;
             elsif check_xid(l_data_list(i).deq_xid) = 'Y' then -- Транзакция активна.
-              l_data_list.delete(i); -- Заблокировано (пропускаем).
-            else
-              init_queue(l_queue_s.name);
+              l_data_list.delete(i); -- Активная транзакция (пропускаем).
+            elsif l_data_list(i).qid > 0 then
+              init_queue(l_queue.name);
               if l_data_list(i).deq_try is null then
                 l_data_list(i).deq_try := 1;
               else
                 l_data_list(i).deq_try := l_data_list(i).deq_try + 1;
               end if;
               if l_data_list(i).expire_time < l_time or l_data_list(i).deq_try >= g_queue.try_count then
-                l_data_list(i).qid := -l_queue_s.id;
+                l_data_list(i).qid := -l_data_list(i).qid;
                 l_data_list(i).state := c_state_expired;
               else -- Повторная попытка.
                 l_data_list(i).state := c_state_ready;
@@ -1112,6 +1260,10 @@ is
                   l_ready := l_ready + 1;
                 end if;
               end if;
+            else
+              l_data_list(i).state := c_state_expired;
+              l_data_list(i).enq_time := l_time;
+              l_ready := l_ready + 1;
             end if;
           end loop;
           if l_data_list.count > 0 then
@@ -1122,7 +1274,7 @@ is
                      qd.state = l_data_list(i).state,
                      qd.enq_time = l_data_list(i).enq_time,
                      qd.deq_try = l_data_list(i).deq_try
-               where qd.qid = l_queue_s.id
+               where qd.qid in (l_queue.id, -l_queue.id)
                  and qd.id = l_data_list(i).id;
           end if;
           commit;
@@ -1137,8 +1289,12 @@ is
   is
     l_next_time timestamp(6);
     l_e varchar2(4000);
+    l_hex varchar2(15);
+    l_pipe_name varchar2(128);
+    l_status integer;
   begin
     while active('maintenance', l_next_time) loop
+      -- Очистка индексов очередей.
       for i in (select p.partition_name
                   from user_tab_partitions p
                  where p.table_name = c_data_table
@@ -1152,8 +1308,30 @@ is
             l_e := dbms_utility.format_error_stack;
         end;
       end loop;
+      -- Очистка данных удаленных очередей.
+      for i in (select id from t_queue_drop where clean_time < sysdate) 
+      loop
+        begin
+          l_hex := to_char(i.id, 'fm0xxxxxxxxxxxxxx');
+          l_pipe_name := 'QN_' || upper(l_hex);
+          dbms_pipe.purge(l_pipe_name);
+          l_status := dbms_pipe.remove_pipe(l_pipe_name);
+          for n in 1 .. c_pipe_count loop
+            l_pipe_name := 'QB_' || upper(l_hex) || '_' || to_char(n, 'fm0x');
+            dbms_pipe.purge(l_pipe_name);
+            l_status := dbms_pipe.remove_pipe(l_pipe_name);
+          end loop;
+          exe_at('alter table "' || c_schema || '"."' || c_data_table || '" drop partition SYS_P' || i.id);
+          delete from t_queue_drop where id = i.id;
+          commit;
+        exception
+          when others then
+             rollback;
+        end;
+      end loop;
+      -- Ошибка при очистке индексов.
       if not l_e is null then
-        throw(14, l_e);
+        throw(20, l_e);
       end if;
     end loop;
   end;

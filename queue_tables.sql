@@ -36,7 +36,7 @@ create table t_queue_data(qid integer,
                           expire_time timestamp(6),
                           deq_try integer,
                           deq_xid varchar2(30),
-                          deq_time timestamp(6)) partition by list(qid) automatic (partition empty_lp values (null)) enable row movement;
+                          deq_time timestamp(6)) partition by list(qid) (partition empty_lp values (null)) enable row movement;
 alter table t_queue_data add check (qid is not null);
 alter table t_queue_data add check (state is not null);
 alter table t_queue_data add check (priority is not null);
@@ -70,6 +70,17 @@ comment on column t_queue_process.active is 'Активен';
 insert into t_queue_process values ('monitor', 1, 'Y');
 insert into t_queue_process values ('maintenance', 20, 'Y');
 commit;
+
+create table t_queue_drop(id integer, name varchar2(100), clean_time date);
+alter table t_queue_drop add check (id is not null);
+alter table t_queue_drop add check (name is not null);
+alter table t_queue_drop add check (clean_time is not null);
+create unique index qedp_unq on t_queue_drop(id);
+create index qedp_ce_idx on t_queue_drop(clean_time);
+comment on table t_queue_drop is 'Удаленная очередь';
+comment on column t_queue_drop.id is 'Идентификатор очереди';
+comment on column t_queue_drop.name is 'Наименование очереди';
+comment on column t_queue_drop.clean_time is 'Время очистки данных очереди';
 
 @@p_queue.pck
 
